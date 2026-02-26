@@ -1,0 +1,245 @@
+@import "tailwindcss";
+
+/* ─── GOOGLE FONTS (loaded from index.html) ───────────── */
+/* ─── GEIST FONT FALLBACK (npm pkg requires next.js) ──── */
+
+/* ─── DARK MODE (DEFAULT) ─────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-base: #141310;
+  --bg-surface: rgba(26, 25, 22, 0.75);
+  --bg-elevated: rgba(33, 31, 27, 0.8);
+
+  /* Text */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #475569;
+
+  /* Borders */
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(0, 200, 240, 0.5);
+
+  /* Accents */
+  --accent-primary: #00C8F0;
+  --accent-primary-hover: #00B0D8;
+  --accent-blue: #3B6EF0;
+  --accent-gold: #F5A623;
+  --accent-gold-hover: #E09510;
+  --accent-green: #00E87A;
+  --accent-coral: #F43F5E;
+  --accent-coral-hover: #E0354F;
+  --accent-violet: #8B5CF6;
+
+  /* Neumorphic shadows (dark) */
+  --shadow-neu-raised: 8px 8px 20px rgba(0, 0, 0, 0.6), -8px -8px 20px rgba(42, 39, 32, 0.25);
+  --shadow-neu-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.4), inset -3px -3px 8px rgba(42, 39, 32, 0.15);
+  --shadow-neu-pressed: inset 2px 2px 6px rgba(0, 0, 0, 0.5), inset -2px -2px 6px rgba(42, 39, 32, 0.12);
+
+  /* Glows */
+  --glow-cyan: 0 0 20px rgba(0, 200, 240, 0.25);
+  --glow-gold: 0 0 20px rgba(245, 166, 35, 0.25);
+  --glow-coral: 0 0 20px rgba(244, 63, 94, 0.25);
+  --glow-green: 0 0 20px rgba(0, 232, 122, 0.25);
+
+  /* Toggle-specific */
+  --toggle-track-bg: rgba(30, 28, 25, 0.85);
+  --toggle-track-border: rgba(255, 255, 255, 0.08);
+  --toggle-track-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --toggle-knob-bg: #211F1B;
+  --toggle-knob-shadow: 4px 4px 12px rgba(0, 0, 0, 0.6), -2px -2px 6px rgba(255, 255, 255, 0.05);
+  --toggle-active-glow: 0 0 20px rgba(245, 166, 35, 0.45), 0 0 40px rgba(245, 166, 35, 0.2);
+}
+
+/* ─── LIGHT MODE ──────────────────────────────────────── */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Backgrounds — Smart Home Neomorphism palette */
+  --bg-base: #E0E5EC;
+  --bg-surface: #E0E5EC;
+  --bg-elevated: #D1D9E6;
+
+  /* Text */
+  --text-primary: #2D3748;
+  --text-secondary: #4A5568;
+  --text-muted: #718096;
+
+  /* Borders */
+  --border-default: rgba(163, 177, 198, 0.25);
+  --border-focus: rgba(0, 168, 208, 0.6);
+
+  /* Accents */
+  --accent-primary: #0098BE;
+  --accent-primary-hover: #007FA3;
+  --accent-blue: #2A5AD4;
+  --accent-gold: #D48A10;
+  --accent-gold-hover: #B87A0E;
+  --accent-green: #00B860;
+  --accent-coral: #E03050;
+  --accent-coral-hover: #C42040;
+  --accent-violet: #7040E0;
+
+  /* Neumorphic shadows (light) — deep, soft, matching #E0E5EC */
+  --shadow-neu-raised: 9px 9px 16px rgba(163, 177, 198, 0.6), -9px -9px 16px rgba(255, 255, 255, 0.8);
+  --shadow-neu-inset: inset 5px 5px 10px rgba(163, 177, 198, 0.5), inset -5px -5px 10px rgba(255, 255, 255, 0.8);
+  --shadow-neu-pressed: inset 4px 4px 8px rgba(163, 177, 198, 0.6), inset -4px -4px 8px rgba(255, 255, 255, 0.7);
+
+  /* Glows (softer in light mode) */
+  --glow-cyan: 0 0 20px rgba(0, 160, 200, 0.2);
+  --glow-gold: 0 0 20px rgba(200, 140, 20, 0.2);
+  --glow-coral: 0 0 20px rgba(220, 48, 80, 0.2);
+  --glow-green: 0 0 20px rgba(0, 180, 90, 0.2);
+
+  /* Toggle-specific — neumorphic light */
+  --toggle-track-bg: #E0E5EC;
+  --toggle-track-border: rgba(255, 255, 255, 0.6);
+  --toggle-track-shadow: 6px 6px 14px rgba(163, 177, 198, 0.6), -6px -6px 14px rgba(255, 255, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --toggle-knob-bg: #E0E5EC;
+  --toggle-knob-shadow: 4px 4px 10px rgba(163, 177, 198, 0.6), -4px -4px 10px rgba(255, 255, 255, 0.8);
+  --toggle-active-glow: 0 0 15px rgba(0, 160, 220, 0.4), 0 0 30px rgba(0, 160, 220, 0.15);
+}
+
+/* ─── FONTS ────────────────────────────────────────────── */
+:root {
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-technical: 'Geist', 'Inter', sans-serif;
+  --font-code: 'JetBrains Mono', monospace;
+}
+
+/* ─── BASE RESETS ─────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background-color 350ms ease, color 350ms ease;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+a:hover {
+  color: var(--accent-primary-hover);
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+::placeholder {
+  color: var(--text-muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: rgba(0, 200, 240, 0.2);
+  color: var(--text-primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ─── UTILITY CLASSES ─────────────────────────────────── */
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-technical {
+  font-family: var(--font-technical);
+}
+
+.font-code {
+  font-family: var(--font-code);
+}
+
+/* ─── THEME TRANSITION ───────────────────────────────── */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, box-shadow, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Exclude transition from elements that should be instant */
+button,
+a,
+input,
+textarea {
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform, filter;
+}
+
+/* ─── REDUCED MOTION ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
