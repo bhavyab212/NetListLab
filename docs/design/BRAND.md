@@ -19,9 +19,10 @@
 NetListLab is a **precision workshop with creative soul.** The interface feels
 clean, structured, and technically credible — like a well-organized engineering
 workbench — but expresses energy through vibrant accent colors, glowing hover
-states, and physical depth via neumorphic surfaces. It makes a student's ESP32
-project look like a million-dollar product. Zero-friction usability is the #1
-design law: every user should know where to go and what to do within 3 seconds.
+states, and the physical depth of **Premium Glassmorphism**. This aesthetic pairs
+crisp, glassy hairlines and diffuse ambient shadows with deep translucent surfaces
+to make a student's ESP32 project look like a million-dollar product. Zero-friction
+usability is the #1 design law: every user should know where to go and what to do within 3 seconds.
 
 ---
 
@@ -31,21 +32,21 @@ design law: every user should know where to go and what to do within 3 seconds.
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `bg-base` | `#141310` | Primary page background |
-| `bg-surface` | `#1A1916` | Cards, panels |
-| `bg-elevated` | `#211F1B` | Modals, dropdowns, popovers |
-| `text-primary` | `#F5F5F0` | Primary text (headings, body) |
-| `text-secondary` | `#A8A49C` | Secondary text (labels, metadata) |
-| `text-muted` | `#6B6760` | Muted text (placeholders, disabled) |
-| `border-default` | `#2A2720` | Default borders |
-| `border-focus` | `#00C8F0` | Focus ring color |
+| `bg-base` | `#020617` (Deep Obsidian) | Primary page background |
+| `bg-surface` | `rgba(30, 41, 59, 0.5)` + Blur | Cards, panels (Glassmorphic) |
+| `bg-elevated` | `rgba(15, 23, 42, 0.6)` + Blur | Modals, dropdowns, popovers |
+| `text-primary` | `#F8FAFC` | Primary text (headings, body) |
+| `text-secondary` | `#94A3B8` | Secondary text (labels, metadata) |
+| `text-muted` | `#475569` | Muted text (placeholders, disabled) |
+| `border-default` | `rgba(255,255,255,0.08)` | Default borders |
+| `border-focus` | `rgba(0, 200, 240, 0.5)` | Focus ring color |
 
 ### Light Mode
 
-| Token | Hex | Usage |
+| Token | Hex/RGBA | Usage |
 |-------|-----|-------|
-| `bg-base` | `#F5F6FB` | Primary page background |
-| `bg-surface` | `#EEEEF6` | Cards, panels |
+| `bg-base` | `#F8FAFC` | Primary page background |
+| `bg-surface` | `#FFFFFF` | Cards, panels (Opaque) |
 | `bg-elevated` | `#E8E9F2` | Modals, dropdowns, popovers |
 | `text-primary` | `#141310` | Primary text |
 | `text-secondary` | `#5C5A55` | Secondary text |
@@ -67,21 +68,21 @@ design law: every user should know where to go and what to do within 3 seconds.
 | `accent-coral-hover` | `#E0354F` | Coral hover state |
 | `accent-violet` | `#8B5CF6` | AI/ML domain only |
 
-### Neumorphic Shadows (Dark Mode)
+### Premium Diffuse Shadows (Dark Mode)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `shadow-neumorphic-raised` | `8px 8px 16px #0A0A08, -8px -8px 16px #2A2720` | Cards, buttons (extruded) |
-| `shadow-neumorphic-inset` | `inset 4px 4px 8px #0A0A08, inset -4px -4px 8px #2A2720` | Input fields (recessed) |
-| `shadow-neumorphic-pressed` | `inset 2px 2px 4px #0A0A08, inset -2px -2px 4px #2A2720` | Button pressed state |
+| `shadow-neu-raised` | `0 20px 40px -10px rgba(0,0,0,0.5)` | Floating glass panels, buttons |
+| `shadow-neu-inset` | `inset 0 0 0 1px rgba(255,255,255,0.05)` | Input fields, recessed areas |
+| `shadow-neu-pressed` | `inset 0 2px 4px rgba(0,0,0,0.5)` | Button pressed state |
 
-### Neumorphic Shadows (Light Mode)
+### Premium Diffuse Shadows (Light Mode)
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `shadow-neumorphic-raised` | `8px 8px 16px #C8C8D6, -8px -8px 16px #FFFFFF` | Cards, buttons (extruded) |
-| `shadow-neumorphic-inset` | `inset 4px 4px 8px #C8C8D6, inset -4px -4px 8px #FFFFFF` | Input fields (recessed) |
-| `shadow-neumorphic-pressed` | `inset 2px 2px 4px #C8C8D6, inset -2px -2px 4px #FFFFFF` | Button pressed state |
+| `shadow-neu-raised` | `0 20px 40px -10px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.02)` | Pure white cards, buttons |
+| `shadow-neu-inset` | `inset 0 0 0 1px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)` | Input fields |
+| `shadow-neu-pressed` | `inset 0 2px 4px rgba(0,0,0,0.1)` | Button pressed state |
 
 ---
 
