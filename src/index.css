@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme inline {
+  --color-primary: #8ccc73;
+  --color-primary-dark: #5C9A4A;
+  --color-background-light: #F2F0F0;
+  --color-surface-light: #FFFFFF;
+  --color-text-main-light: #2D3436;
+  --color-text-muted-light: #636E72;
+  --color-background-dark: #08080C;
+  --color-surface-dark: #1C1C24;
+  --color-text-main-dark: #FFFFFF;
+  --color-text-muted-dark: #9d9abc;
+}
+
 /* ─── GOOGLE FONTS (loaded from index.html) ───────────── */
 /* ─── GEIST FONT FALLBACK (npm pkg requires next.js) ──── */
 
@@ -242,4 +255,74 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── COMPONENT STYLES ────────────────────────────────── */
+
+.glass-nav {
+  @apply transition-all duration-300;
+}
+html:not(.dark) .glass-nav {
+  @apply bg-white/75 backdrop-blur-[24px] border border-white/40 shadow-lg shadow-black/5;
+}
+html.dark .glass-nav {
+  @apply bg-[#1C1C24]/80 backdrop-blur-[32px] border border-white/10 shadow-2xl shadow-black/50;
+}
+
+.card-surface {
+  @apply transition-all duration-500 overflow-hidden rounded-2xl border;
+}
+html:not(.dark) .card-surface {
+  @apply bg-white/90 backdrop-blur-md border-white/60 shadow-md hover:shadow-xl hover:-translate-y-1;
+}
+html.dark .card-surface {
+  @apply bg-[#1C1C24] border-white/10 shadow-xl hover:shadow-2xl hover:-translate-y-3 hover:border-primary/40;
+}
+
+.filter-area {
+  @apply backdrop-blur-xl transition-all duration-300 rounded-3xl p-8 lg:p-10 border;
+}
+html:not(.dark) .filter-area {
+  @apply bg-white/60 border-white/80 shadow-lg;
+}
+html.dark .filter-area {
+  @apply bg-[#14141B]/60 border-white/5 shadow-2xl;
+}
+
+.section-header-area {
+  @apply flex items-center gap-3 backdrop-blur-md border rounded-2xl px-6 py-3 w-fit mb-12;
+}
+html:not(.dark) .section-header-area {
+  @apply bg-white/40 border-white/60 shadow-sm;
+}
+html.dark .section-header-area {
+  @apply bg-white/5 border-white/5;
+}
+
+.neumorphic-pill {
+  @apply transition-all duration-200 border rounded-full px-5 h-10 flex items-center gap-2 text-sm font-medium;
+}
+html:not(.dark) .neumorphic-pill {
+  @apply bg-[#F2F0F0] border-white/40 shadow-[4px_4px_8px_#d1cfcf,-4px_-4px_8px_#ffffff] hover:text-primary active:shadow-[inset_2px_2px_5px_#d1cfcf,inset_-2px_-2px_5px_#ffffff];
+}
+html.dark .neumorphic-pill {
+  @apply bg-white/5 border-white/5 text-slate-400 hover:border-primary/50 hover:text-white active:scale-95;
+}
+
+.btn-depth {
+  @apply transition-all duration-300 border rounded-2xl relative overflow-hidden;
+}
+html:not(.dark) .btn-depth {
+  @apply bg-white border-white/60 shadow-[6px_6px_12px_#d1cfcf,-6px_-6px_12px_#ffffff] hover:shadow-[8px_8px_16px_#d1cfcf,-8px_-8px_16px_#ffffff];
+}
+html.dark .btn-depth {
+  @apply bg-[#1C1C24] border-white/10 shadow-[0_15px_35px_-5px_rgba(0,0,0,0.6)] hover:border-primary/50 hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.7)];
+}
+
+.hide-scrollbar::-webkit-scrollbar { 
+  display: none; 
+}
+.hide-scrollbar { 
+  -ms-overflow-style: none; 
+  scrollbar-width: none; 
 }
