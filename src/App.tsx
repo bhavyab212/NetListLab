@@ -27,8 +27,8 @@ function App() {
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/onboarding" element={<OnboardingPage />} />
                     <Route path="/explore" element={<ExplorePage />} />
-                    <Route path="/" element={<Navigate to="/explore" replace />} />
-                    <Route path="*" element={<Navigate to="/explore" replace />} />
+                    <Route path="/" element={<Navigate to="/login" replace />} />
+                    <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
             </Toaster>
         </BrowserRouter>

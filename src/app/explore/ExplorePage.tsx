@@ -189,37 +189,38 @@ export default function ExplorePage() {
           </div>
         </div>
 
-        {/* Mobile Filter Toggle */}
-        <div
-          style={{
-            display: 'none',
-            '@media (max-width: 1024px)': {
-              display: 'block',
-            },
-          }}
-        >
-          <button
-            onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              padding: '12px 16px',
-              backgroundColor: '#00C8F0',
-              color: '#020617',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              zIndex: 40,
-              boxShadow: '0 8px 24px rgba(0, 200, 240, 0.3)',
-            }}
-          >
-            {isFilterPanelOpen ? 'Hide Filters' : 'Show Filters'}
-          </button>
-        </div>
       </div>
+
+      {/* Mobile Filter Toggle */}
+      <style>{`
+        @media (max-width: 1024px) {
+          .mobile-filter-toggle {
+            display: block !important;
+          }
+        }
+      `}</style>
+      <button
+        onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+        className="mobile-filter-toggle"
+        style={{
+          display: 'none',
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          padding: '12px 16px',
+          backgroundColor: '#00C8F0',
+          color: '#020617',
+          border: 'none',
+          borderRadius: '8px',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+          zIndex: 40,
+          boxShadow: '0 8px 24px rgba(0, 200, 240, 0.3)',
+        }}
+      >
+        {isFilterPanelOpen ? 'Hide Filters' : 'Show Filters'}
+      </button>
 
       {/* Mobile responsive styles */}
       <style>{`
