@@ -5,6 +5,7 @@ import { useThemeStore } from './stores/themeStore';
 import LoginPage from './app/login/LoginPage';
 import RegisterPage from './app/register/RegisterPage';
 import OnboardingPage from './app/onboarding/OnboardingPage';
+import ExplorePage from './app/explore/ExplorePage';
 
 function ThemeSync() {
     const { theme } = useThemeStore();
@@ -25,8 +26,9 @@ function App() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/onboarding" element={<OnboardingPage />} />
-                    <Route path="/" element={<Navigate to="/login" replace />} />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
+                    <Route path="/explore" element={<ExplorePage />} />
+                    <Route path="/" element={<Navigate to="/explore" replace />} />
+                    <Route path="*" element={<Navigate to="/explore" replace />} />
                 </Routes>
             </Toaster>
         </BrowserRouter>
