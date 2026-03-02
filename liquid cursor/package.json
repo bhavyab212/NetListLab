@@ -1,0 +1,22 @@
+{
+    "name": "liquid-cursor",
+    "version": "1.0.0",
+    "description": "A self-contained, portable liquid water-drop cursor for React. Paste the src/ folder into any React/Next.js/Vite project and it works.",
+    "peerDependencies": {
+        "react": ">=17.0.0",
+        "react-dom": ">=17.0.0",
+        "framer-motion": ">=10.0.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "@types/react": "^18.0.0"
+    },
+    "keywords": [
+        "cursor",
+        "liquid",
+        "framer-motion",
+        "react",
+        "animation"
+    ],
+    "license": "MIT"
+}

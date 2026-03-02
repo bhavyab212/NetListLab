@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Cursor - Standalone Demo</title>
+    <style>
+        /* Base Styles */
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0b0f19;
+            /* Dark tech background */
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        /* Essential for hiding default cursor when active */
+        [data-liquid-cursor],
+        [data-liquid-cursor] * {
+            cursor: none !important;
+        }
+
+        /* Demo Login Box element */
+        .login-box {
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            width: 340px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .dummy-input {
+            width: 100%;
+            height: 40px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+        }
+
+        .dummy-button {
+            width: 100%;
+            height: 40px;
+            background: #0ea5e9;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* -----------------------
+           Liquid Cursor Styles 
+        ------------------------ */
+
+        #cursor-main,
+        #cursor-trail {
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        /* The trail shadow */
+        #cursor-trail {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 200, 240, 0.3) 0%, rgba(0, 200, 240, 0) 70%);
+            filter: blur(4px);
+            z-index: 9998;
+        }
+
+        /* The main dropping cursor */
+        #cursor-main {
+            width: 28px;
+            height: 28px;
+            transform-origin: center;
+        }
+
+        .drop-body {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 35% 35%, rgba(0, 220, 255, 0.7) 0%, rgba(0, 200, 240, 0.3) 50%, rgba(0, 180, 220, 0.1) 100%);
+            box-shadow: inset -2px -2px 6px rgba(0, 200, 240, 0.4), inset 2px 2px 4px rgba(255, 255, 255, 0.4), 0 0 20px rgba(0, 200, 240, 0.5);
+            backdrop-filter: blur(2px);
+            animation: blobWobble 3s linear infinite;
+            position: relative;
+            transform-origin: center;
+            transition: transform 0.15s ease-out;
+            /* For click squish */
+        }
+
+        .specular {
+            position: absolute;
+            top: 18%;
+            left: 22%;
+            width: 32%;
+            height: 28%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, transparent 70%);
+        }
+
+        /* The organic wobble of the water drop */
+        @keyframes blobWobble {
+            0% {
+                border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+            }
+
+            25% {
+                border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+            }
+
+            50% {
+                border-radius: 40% 60% 50% 50% / 50% 50% 60% 40%;
+            }
+
+            75% {
+                border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+            }
+
+            100% {
+                border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+            }
+        }
+
+        /* The expanding splash ring on click */
+        .cursor-ripple {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 200, 240, 0.4);
+            pointer-events: none;
+            z-index: 9997;
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.7s ease-out, opacity 0.7s ease-out;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Demo UI with data-liquid-cursor tag to trigger visibility -->
+    <div class="login-box" data-liquid-cursor>
+        <h2>Welcome Back</h2>
+        <p>Hover over this panel to activate the Liquid Cursor.</p>
+        <div class="dummy-input"></div>
+        <div class="dummy-input"></div>
+        <button class="dummy-button">Sign In</button>
+    </div>
+
+    <!-- Cursor Elements -->
+    <div id="cursor-trail"></div>
+    <div id="cursor-main">
+        <div class="drop-body" id="cursor-drop-body">
+            <div class="specular"></div>
+        </div>
+    </div>
+
+    <script>
+        const mainNode = document.getElementById('cursor-main');
+        const trailNode = document.getElementById('cursor-trail');
+        const dropBody = document.getElementById('cursor-drop-body');
+
+        // Target (mouse) position
+        let m = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+        // Main cursor simulation values
+        let sx = m.x, sy = m.y;
+
+        // Trail cursor simulation values
+        let tx = m.x, ty = m.y;
+
+        let isVisible = false;
+
+        // Tracks mouse movements to update target
+        document.addEventListener('mousemove', e => {
+            m.x = e.clientX;
+            m.y = e.clientY;
+
+            // Check if hovered element has the tag
+            const target = document.elementFromPoint(m.x, m.y);
+            if (target && target.closest('[data-liquid-cursor]')) {
+                isVisible = true;
+            } else {
+                isVisible = false;
+            }
+        });
+
+        // Tracks clicks for ripples and squish
+        document.addEventListener('mousedown', e => {
+            if (isVisible) {
+                // 1. Create Ripple
+                const ripple = document.createElement('div');
+                ripple.className = 'cursor-ripple';
+                ripple.style.left = e.clientX + 'px';
+                ripple.style.top = e.clientY + 'px';
+                document.body.appendChild(ripple);
+
+                // Animate ripple
+                requestAnimationFrame(() => {
+                    ripple.style.transform = 'translate(-50%, -50%) scale(4)';
+                    ripple.style.opacity = '0';
+                });
+
+                // Remove ripple after transition
+                setTimeout(() => ripple.remove(), 700);
+
+                // 2. Squish Effect on the main drop
+                dropBody.style.transform = 'scale(0.6)';
+                setTimeout(() => dropBody.style.transform = 'scale(1.2)', 100);
+                setTimeout(() => dropBody.style.transform = 'scale(1)', 250);
+            }
+        });
+
+        // Hide cursor if cursor leaves window
+        document.addEventListener('mouseleave', () => isVisible = false);
+
+        // Core Render Loop
+        function render() {
+            // LERP for smooth lagging movement
+            // Main drop responds faster (0.2)
+            sx += (m.x - sx) * 0.2;
+            sy += (m.y - sy) * 0.2;
+
+            // Trail drop responds slower (0.1)
+            tx += (m.x - tx) * 0.1;
+            ty += (m.y - ty) * 0.1;
+
+            // Calculate velocity for stretching the drop
+            let dx = m.x - sx;
+            let dy = m.y - sy;
+            let speed = Math.sqrt(dx * dx + dy * dy);
+
+            // Maximum stretch factor to avoid tearing apart
+            let stretch = Math.min(speed * 0.008, 0.3);
+
+            // Angle to know which direction to stretch
+            let angle = Math.atan2(dy, dx);
+
+            // Apply transforms: center (-50%), rotate, and scale stretch
+            mainNode.style.transform = `translate(${sx - 14}px, ${sy - 14}px) rotate(${angle}rad) scale(${1 + stretch}, ${1 - stretch * 0.5})`;
+
+            // Apply coordinates for trail
+            trailNode.style.transform = `translate(${tx - 8}px, ${ty - 8}px)`;
+
+            // Update visibility opacity
+            mainNode.style.opacity = isVisible ? 1 : 0;
+            trailNode.style.opacity = isVisible ? 0.5 : 0;
+
+            requestAnimationFrame(render);
+        }
+
+        // Start render loop
+        render();
+    </script>
+</body>
+
+</html>
