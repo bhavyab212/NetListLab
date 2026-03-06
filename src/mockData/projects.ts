@@ -8,15 +8,33 @@ export interface Project {
   description: string;
   image: string;
   category: string;
-  categoryStyles: string;
-  level: string;
+  categoryStyles?: string;
+  level?: string;
+  difficulty?: string;
   tags: string[];
+  bom?: { name: string; category: string; qty: number; price: string; supplier: string; link: string; }[];
+  buildSteps?: { title: string; body: string; time: string; imageUrl: string; }[];
+  codeFiles?: { id: string; name: string; language: string; content: string; }[];
   stars: number;
   views: number;
   comments: number;
   forks: number;
   createdAt: string;
   status: 'published' | 'draft';
+
+  // New Fields
+  prerequisites?: string[];
+  tools?: string[];
+  designDecisions?: { q: string; a: string }[];
+  objectives?: string[];
+  githubUrl?: string;
+  docsUrl?: string;
+  schematics?: { name: string; tag: string; tool: string; layers: string; desc: string; img: string; }[];
+  pcbLayers?: { num: string; color: string; type: string; weight: string; }[];
+  designRules?: { rule: string; value: string; status: string; }[];
+  galleryImages?: string[];
+  videos?: { title: string; url: string }[];
+  downloads?: { name: string; size: string; fmt: string; url: string }[];
 }
 
 export const projects: Project[] = [

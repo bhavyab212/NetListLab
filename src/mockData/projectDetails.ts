@@ -8,7 +8,7 @@ export interface BuildStep {
   image: string;
 }
 
-export interface ProjectDetail extends Project {
+export interface ProjectDetail extends Omit<Project, 'bom' | 'buildSteps' | 'schematics' | 'downloads'> {
   fullDescription: string;
   bom: BOMItem[];
   schematics: string[];
