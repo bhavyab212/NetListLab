@@ -6,8 +6,8 @@ import {
     Cpu, ArrowRight, Edit2, Archive, ExternalLink, BarChart2,
     Bookmark, Clock, Zap, LogOut, User
 } from "lucide-react";
-import { projects } from "@/mockData/projects";
-import { mockNotifications } from "@/mockData/notifications";
+import { useProjectsStore } from "@/stores/projectsStore";
+import { useNotificationStore } from "@/stores/notificationStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion } from "framer-motion";
@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type NavItem = "overview" | "projects" | "starred" | "notifications" | "settings";
+type NavItem = "overview" | "projects" | "forked" | "starred" | "notifications" | "settings";
 
 export default function DashboardPage() {
     const { isDark, toggle } = useThemeStore();
@@ -27,26 +27,43 @@ export default function DashboardPage() {
     const router = useRouter();
     const [activeNav, setActiveNav] = useState<NavItem>("overview");
 
+    const { getMyProjects, projects, starredIds, toggleBookmark, getForkedProjects, forkProject, bookmarkedIds } = useProjectsStore();
+    const { notifications, unreadCount: unreadNotifs } = useNotificationStore();
+
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => setIsMounted(true), []);
+
     useEffect(() => {
-        if (!isAuthenticated) router.push("/login");
-    }, [isAuthenticated, router]);
+        if (isMounted && !isAuthenticated) router.push("/login");
+    }, [isMounted, isAuthenticated, router]);
 
-    if (!isAuthenticated || !authUser) return null;
+    if (!isMounted || !isAuthenticated || !authUser) return null;
 
-    const myProjects = projects.filter(p => p.authorId === "user-1");
-    const starredProjects = projects.slice(3, 7);
-    const unreadNotifs = mockNotifications.filter(n => !n.read);
+    const myProjects = getMyProjects(authUser.id);
+    const starredProjects = projects.filter(p => starredIds.has(p.id));
+    const forkedProjects = getForkedProjects();
 
     const totalStars = myProjects.reduce((s, p) => s + p.stars, 0);
     const totalForks = myProjects.reduce((s, p) => s + p.forks, 0);
     const totalViews = myProjects.reduce((s, p) => s + p.views, 0);
     const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
 
+    const handleFork = (e: React.MouseEvent, pId: number, pTitle: string) => {
+        e.stopPropagation();
+        if (!authUser) return;
+        const newId = forkProject(pId, authUser.id, `@${authUser.username}`, authUser.avatar);
+        toast.success("Workspace Created", { description: `Forked ${pTitle} to your laboratory.` });
+        if (newId) {
+            router.push(`/project/${newId}/edit`);
+        }
+    };
+
     const navItems = [
         { id: "overview" as NavItem, label: "Overview", icon: BarChart2 },
         { id: "projects" as NavItem, label: "My Projects", icon: Cpu, badge: myProjects.length },
+        { id: "forked" as NavItem, label: "Forked", icon: GitFork, badge: forkedProjects.length },
         { id: "starred" as NavItem, label: "Starred", icon: Bookmark },
-        { id: "notifications" as NavItem, label: "Notifications", icon: Bell, badge: unreadNotifs.length },
+        { id: "notifications" as NavItem, label: "Notifications", icon: Bell, badge: unreadNotifs },
         { id: "settings" as NavItem, label: "Settings", icon: Settings },
     ];
 
@@ -202,7 +219,7 @@ export default function DashboardPage() {
                                             </button>
                                         </div>
                                         <div className="space-y-3">
-                                            {mockNotifications.slice(0, 5).map(n => (
+                                            {notifications.slice(0, 5).map(n => (
                                                 <div key={n.id} className={`flex items-center gap-5 p-5 rounded-2xl border transition-all ${!n.read ? "bg-primary/5 border-primary/10" : "bg-card/40 border-border/50"} hover:border-primary/30`}>
                                                     <img src={n.actorAvatar} alt={n.actor} className="w-9 h-9 rounded-full border border-border shrink-0" />
                                                     <p className="text-sm font-medium text-foreground flex-1">
@@ -246,13 +263,14 @@ export default function DashboardPage() {
                                                         <span className={`px-2.5 py-0.5 rounded-full border text-[9px] ${p.status === "published" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground border-border"}`}>{p.status}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-3 shrink-0">
+                                                <div className="flex gap-2 shrink-0">
+                                                    <button onClick={(e) => { e.preventDefault(); toggleBookmark(p.id); }} className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${projects.some(proj => proj.id === p.id && bookmarkedIds?.has(p.id)) ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/50 border-border text-muted-foreground hover:text-primary"}`}><Bookmark size={13} /></button>
+                                                    <button onClick={(e) => handleFork(e, p.id, p.title)} className="flex items-center gap-2 p-2 rounded-xl bg-primary/5 border border-primary/20 text-primary hover:bg-primary/20 transition-all"><GitFork size={13} /></button>
                                                     <Link href={`/project/${p.id}/edit`}>
-                                                        <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"><Edit2 size={13} /> Edit</button>
+                                                        <button className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all"><Edit2 size={13} /> Edit</button>
                                                     </Link>
-                                                    <button onClick={() => toast.info("Archive", { description: `${p.title} archived.` })} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-rose-500 hover:border-rose-500/40 transition-all"><Archive size={13} /></button>
                                                     <Link href={`/project/${p.id}`}>
-                                                        <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all"><ExternalLink size={13} /> View</button>
+                                                        <button className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all"><ExternalLink size={13} /> View</button>
                                                     </Link>
                                                 </div>
                                             </div>
@@ -272,6 +290,9 @@ export default function DashboardPage() {
                                                     <div className="aspect-[16/9] relative overflow-hidden">
                                                         <img src={p.image} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                                                         <div className="absolute top-4 left-4"><Star size={18} className="text-amber-400 fill-amber-400" /></div>
+                                                        <button onClick={(e) => { e.preventDefault(); toggleBookmark(p.id); }} className="absolute top-4 right-4 p-2 rounded-xl bg-card/80 backdrop-blur-md border border-border hover:bg-primary/20 hover:text-primary transition-all">
+                                                            <Bookmark size={15} className={projects.some(proj => proj.id === p.id && bookmarkedIds?.has(p.id)) ? "text-primary fill-primary" : "text-muted-foreground"} />
+                                                        </button>
                                                     </div>
                                                     <div className="p-6">
                                                         <h4 className="text-lg font-black font-display text-foreground group-hover:text-primary transition-colors mb-1">{p.title}</h4>
@@ -284,15 +305,48 @@ export default function DashboardPage() {
                                 </motion.div>
                             )}
 
+                            {/* ─── FORKED PROJECTS ─── */}
+                            {activeNav === "forked" && (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                                    <h1 className="text-3xl font-black font-display flex items-center gap-3">
+                                        Forked Workspaces
+                                        <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">{forkedProjects.length} Forks</span>
+                                    </h1>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {forkedProjects.length === 0 ? (
+                                            <p className="text-muted-foreground/50 text-sm font-medium col-span-2">You haven't forked any projects yet. Go Explore and bring something to your lab!</p>
+                                        ) : forkedProjects.map(p => (
+                                            <div key={p.id} className="bg-card/60 border border-border rounded-[24px] overflow-hidden hover:border-primary/30 transition-all group flex flex-col">
+                                                <div className="aspect-[16/9] relative overflow-hidden">
+                                                    <img src={p.image} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                    <div className="absolute top-4 left-4"><GitFork size={18} className="text-primary" /></div>
+                                                </div>
+                                                <div className="p-6 flex-1 flex flex-col justify-between">
+                                                    <div>
+                                                        <h4 className="text-lg font-black font-display text-foreground group-hover:text-primary transition-colors mb-2 line-clamp-1">{p.title}</h4>
+                                                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-4">Original by @{p.author}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Link className="flex-1" href={`/project/${p.id}/edit`}>
+                                                            <button className="w-full h-10 rounded-xl bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all">Continue Building</button>
+                                                        </Link>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+
                             {/* ─── NOTIFICATIONS ─── */}
                             {activeNav === "notifications" && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                                     <div className="flex items-center justify-between">
                                         <h1 className="text-3xl font-black font-display">Notifications</h1>
-                                        <span className="px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">{unreadNotifs.length} unread</span>
+                                        <span className="px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">{unreadNotifs} unread</span>
                                     </div>
                                     <div className="space-y-3">
-                                        {mockNotifications.map(n => (
+                                        {notifications.map(n => (
                                             <div key={n.id} className={`flex items-start gap-5 p-6 rounded-[20px] border transition-all ${!n.read ? "bg-primary/5 border-primary/10" : "bg-card/40 border-border/50"} hover:border-primary/30`}>
                                                 <img src={n.actorAvatar} alt={n.actor} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
                                                 <div className="flex-1">

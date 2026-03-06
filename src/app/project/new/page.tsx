@@ -12,26 +12,32 @@ import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
 import Logo from "@/components/ui/Logo";
 import Button from "@/components/ui/Button";
-import { toast } from "sonner";
+import { useProjectsStore } from "@/stores/projectsStore";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const STEPS = [
     { id: 1, label: "Basics", icon: FileText, desc: "Name your artifact" },
-    { id: 2, label: "Build Steps", icon: ShoppingCart, desc: "Document the process" },
-    { id: 3, label: "BOM", icon: Tag, desc: "Bill of materials" },
-    { id: 4, label: "Code", icon: Code, desc: "Upload firmware" },
-    { id: 5, label: "Publish", icon: Rocket, desc: "Review and launch" },
+    { id: 2, label: "Metadata", icon: Tag, desc: "Objectives & tools" },
+    { id: 3, label: "Build Steps", icon: ShoppingCart, desc: "Document the process" },
+    { id: 4, label: "BOM", icon: Tag, desc: "Bill of materials" },
+    { id: 5, label: "Schematics", icon: Rocket, desc: "Circuit diagrams" },
+    { id: 6, label: "Code", icon: Code, desc: "Upload firmware" },
+    { id: 7, label: "Media", icon: Rocket, desc: "Photos & vids" },
+    { id: 8, label: "Publish", icon: Rocket, desc: "Review and launch" },
 ];
 
 const CATEGORIES = ["Electronics", "Hardware", "Robotics", "Software", "AI/ML"];
 const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
-interface BOMRow { name: string; category: string; qty: number; price: string; }
-interface BuildStep { title: string; body: string; }
+interface BOMRow { name: string; category: string; qty: number; price: string; supplier: string; link: string; }
+interface BuildStep { title: string; body: string; time: string; imageUrl: string; }
+interface CodeFile { name: string; language: string; content: string; id: string; }
 
 export default function NewProjectPage() {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated, user: authUser } = useAuthStore();
+    const { addProject } = useProjectsStore();
     const router = useRouter();
     const [step, setStep] = useState(1);
 
@@ -49,16 +55,38 @@ export default function NewProjectPage() {
     const [tagInput, setTagInput] = useState("");
 
     // Step 2 State
-    const [buildSteps, setBuildSteps] = useState<BuildStep[]>([{ title: "", body: "" }]);
+    const [prerequisites, setPrerequisites] = useState<string[]>([]);
+    const [prereqInput, setPrereqInput] = useState("");
+    const [tools, setTools] = useState<string[]>([]);
+    const [toolInput, setToolInput] = useState("");
+    const [objectives, setObjectives] = useState<string[]>([]);
+    const [objectiveInput, setObjectiveInput] = useState("");
+    const [designDecisions, setDesignDecisions] = useState<{ q: string, a: string }[]>([]);
+    const [githubUrl, setGithubUrl] = useState("");
+    const [docsUrl, setDocsUrl] = useState("");
 
     // Step 3 State
-    const [bomRows, setBomRows] = useState<BOMRow[]>([{ name: "", category: "", qty: 1, price: "" }]);
+    const [buildSteps, setBuildSteps] = useState<BuildStep[]>([{ title: "", body: "", time: "", imageUrl: "" }]);
 
     // Step 4 State
-    const [code, setCode] = useState("");
-    const [codeLang, setCodeLang] = useState("cpp");
+    const [bomRows, setBomRows] = useState<BOMRow[]>([{ name: "", category: "", qty: 1, price: "", supplier: "", link: "" }]);
 
     // Step 5 State
+    const [schematics, setSchematics] = useState<{ name: string, tag: string, tool: string, layers: string, desc: string, img: string }[]>([]);
+    const [pcbLayers, setPcbLayers] = useState<{ num: string, color: string, type: string, weight: string }[]>([]);
+    const [designRules, setDesignRules] = useState<{ rule: string, value: string, status: string }[]>([]);
+
+    // Step 6 State
+    const [codeFiles, setCodeFiles] = useState<CodeFile[]>([{ id: "1", name: "main.cpp", language: "cpp", content: "" }]);
+    const [activeFileId, setActiveFileId] = useState("1");
+
+    // Step 7 State
+    const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [galleryInput, setGalleryInput] = useState("");
+    const [videos, setVideos] = useState<{ title: string, url: string }[]>([]);
+    const [downloads, setDownloads] = useState<{ name: string, size: string, fmt: string, url: string }[]>([]);
+
+    // Step 8 State
     const [publishStatus, setPublishStatus] = useState<"draft" | "published">("published");
 
     if (!isAuthenticated) return null;
@@ -69,15 +97,33 @@ export default function NewProjectPage() {
     };
     const removeTag = (t: string) => setTags(tags.filter(x => x !== t));
 
-    const addBOMRow = () => setBomRows([...bomRows, { name: "", category: "", qty: 1, price: "" }]);
+    const addBOMRow = () => setBomRows([...bomRows, { name: "", category: "", qty: 1, price: "", supplier: "", link: "" }]);
     const removeBOMRow = (i: number) => setBomRows(bomRows.filter((_, j) => j !== i));
     const updateBOMRow = (i: number, field: keyof BOMRow, val: string | number) =>
         setBomRows(bomRows.map((r, j) => j === i ? { ...r, [field]: val } : r));
 
-    const addStep = () => setBuildSteps([...buildSteps, { title: "", body: "" }]);
+    const addStep = () => setBuildSteps([...buildSteps, { title: "", body: "", time: "", imageUrl: "" }]);
     const removeStep = (i: number) => setBuildSteps(buildSteps.filter((_, j) => j !== i));
     const updateStep = (i: number, field: keyof BuildStep, val: string) =>
         setBuildSteps(buildSteps.map((s, j) => j === i ? { ...s, [field]: val } : s));
+
+    const addCodeFile = () => {
+        const newId = Date.now().toString();
+        setCodeFiles([...codeFiles, { id: newId, name: "new_file.cpp", language: "cpp", content: "" }]);
+        setActiveFileId(newId);
+    };
+    const removeCodeFile = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (codeFiles.length <= 1) return;
+        const filtered = codeFiles.filter(f => f.id !== id);
+        setCodeFiles(filtered);
+        if (activeFileId === id) setActiveFileId(filtered[0].id);
+    };
+    const updateCodeFile = (id: string, field: keyof CodeFile, val: string) => {
+        setCodeFiles(codeFiles.map(f => f.id === id ? { ...f, [field]: val } : f));
+    };
+
+    const activeFile = codeFiles.find(f => f.id === activeFileId) || codeFiles[0];
 
     const canNext = () => {
         if (step === 1) return title.trim() && category && difficulty && description.trim();
@@ -86,15 +132,52 @@ export default function NewProjectPage() {
     };
 
     const handlePublish = () => {
+        if (!authUser) return;
+        const newId = Date.now();
+        addProject({
+            id: newId,
+            title,
+            slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            authorId: authUser.id,
+            author: `@${authUser.username}`,
+            authorAvatar: authUser.avatar,
+            description,
+            category,
+            level: difficulty,
+            image: coverUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2670&auto=format&fit=crop",
+            stars: 0,
+            views: 0,
+            comments: 0,
+            forks: 0,
+            tags,
+            status: publishStatus,
+            bom: bomRows,
+            buildSteps,
+            codeFiles,
+            prerequisites,
+            tools,
+            designDecisions,
+            objectives,
+            githubUrl,
+            docsUrl,
+            schematics,
+            pcbLayers,
+            designRules,
+            galleryImages,
+            videos,
+            downloads,
+            createdAt: new Date().toISOString()
+        });
+
         const tid = toast.loading("Publishing artifact…");
         setTimeout(() => {
             toast.success(publishStatus === "published" ? "🚀 Artifact Published!" : "Draft Saved", {
                 id: tid,
                 description: publishStatus === "published" ? `${title} is now live in the laboratory.` : `${title} saved as draft.`,
-                action: { label: "View", onClick: () => router.push("/dashboard") },
+                action: { label: "View", onClick: () => router.push(`/project/${newId}`) },
             });
             router.push("/dashboard");
-        }, 1500);
+        }, 800);
     };
 
     const inputCls = "w-full h-12 px-5 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40";
@@ -211,8 +294,95 @@ export default function NewProjectPage() {
                                     </div>
                                 )}
 
-                                {/* Step 2: Build Steps */}
+                                {/* Step 2: Metadata */}
                                 {step === 2 && (
+                                    <div className="space-y-8">
+                                        <div className="text-center mb-12">
+                                            <h2 className="text-4xl font-black font-display mb-3">Project Metadata</h2>
+                                            <p className="text-muted-foreground font-medium">Add requirements, rationale, and external links.</p>
+                                        </div>
+                                        <div className="space-y-6">
+                                            {/* Prerequisites */}
+                                            <div>
+                                                <label className={labelCls}>Prerequisites</label>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {prerequisites.map((p, i) => (
+                                                        <span key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[10px] font-black uppercase tracking-widest">
+                                                            {p} <button onClick={() => setPrerequisites(prerequisites.filter((_, idx) => idx !== i))} className="hover:text-rose-500 transition-colors"><Trash2 size={11} /></button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <input value={prereqInput} onChange={e => setPrereqInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && prereqInput.trim()) { setPrerequisites([...prerequisites, prereqInput.trim()]); setPrereqInput(""); } }} placeholder="e.g. Basic soldering" className={`${inputCls} flex-1`} />
+                                                    <button onClick={() => { if (prereqInput.trim()) { setPrerequisites([...prerequisites, prereqInput.trim()]); setPrereqInput(""); } }} className="px-5 h-12 rounded-2xl bg-muted/50 border border-border text-foreground font-black text-[10px] uppercase tracking-widest hover:border-accent/50 hover:text-accent transition-all flex items-center gap-2"><Plus size={15} /> Add</button>
+                                                </div>
+                                            </div>
+
+                                            {/* Tools */}
+                                            <div>
+                                                <label className={labelCls}>Required Tools</label>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {tools.map((t, i) => (
+                                                        <span key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest">
+                                                            {t} <button onClick={() => setTools(tools.filter((_, idx) => idx !== i))} className="hover:text-rose-500 transition-colors"><Trash2 size={11} /></button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && toolInput.trim()) { setTools([...tools, toolInput.trim()]); setToolInput(""); } }} placeholder="e.g. Soldering Iron, Multimeter" className={`${inputCls} flex-1`} />
+                                                    <button onClick={() => { if (toolInput.trim()) { setTools([...tools, toolInput.trim()]); setToolInput(""); } }} className="px-5 h-12 rounded-2xl bg-muted/50 border border-border text-foreground font-black text-[10px] uppercase tracking-widest hover:border-orange-500/50 hover:text-orange-500 transition-all flex items-center gap-2"><Plus size={15} /> Add</button>
+                                                </div>
+                                            </div>
+
+                                            {/* Objectives */}
+                                            <div>
+                                                <label className={labelCls}>Technical Objectives</label>
+                                                <div className="flex flex-col gap-2 mb-3">
+                                                    {objectives.map((o, i) => (
+                                                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border">
+                                                            <span className="text-sm font-medium">{o}</span>
+                                                            <button onClick={() => setObjectives(objectives.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <input value={objectiveInput} onChange={e => setObjectiveInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && objectiveInput.trim()) { setObjectives([...objectives, objectiveInput.trim()]); setObjectiveInput(""); } }} placeholder="e.g. Sub-10uA sleep current" className={`${inputCls} flex-1`} />
+                                                    <button onClick={() => { if (objectiveInput.trim()) { setObjectives([...objectives, objectiveInput.trim()]); setObjectiveInput(""); } }} className="px-5 h-12 rounded-2xl bg-muted/50 border border-border text-foreground font-black text-[10px] uppercase tracking-widest hover:border-primary/50 hover:text-primary transition-all flex items-center gap-2"><Plus size={15} /> Add</button>
+                                                </div>
+                                            </div>
+
+                                            {/* Design Decisions */}
+                                            <div>
+                                                <label className={labelCls}>Design Decisions & Rationale</label>
+                                                <div className="space-y-4 mb-3">
+                                                    {designDecisions.map((d, i) => (
+                                                        <div key={i} className="p-4 rounded-xl bg-muted/20 border border-border relative group">
+                                                            <button onClick={() => setDesignDecisions(designDecisions.filter((_, idx) => idx !== i))} className="absolute top-3 right-3 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                                                            <input value={d.q} onChange={e => setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, q: e.target.value } : x))} placeholder="Question (e.g. Why use this MCU?)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/40" />
+                                                            <textarea value={d.a} onChange={e => setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, a: e.target.value } : x))} rows={2} placeholder="Rationale..." className="w-full bg-transparent outline-none text-sm text-foreground/80 resize-none placeholder:text-muted-foreground/30" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button onClick={() => setDesignDecisions([...designDecisions, { q: "", a: "" }])} className="w-full h-12 rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary/50 transition-all flex items-center justify-center gap-2"><Plus size={14} /> Add Decision</button>
+                                            </div>
+
+                                            {/* External Links */}
+                                            <div className="grid grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className={labelCls}>GitHub Repository</label>
+                                                    <input value={githubUrl} onChange={e => setGithubUrl(e.target.value)} placeholder="https://github.com/..." className={inputCls} />
+                                                </div>
+                                                <div>
+                                                    <label className={labelCls}>Documentation URL</label>
+                                                    <input value={docsUrl} onChange={e => setDocsUrl(e.target.value)} placeholder="https://docs..." className={inputCls} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 3: Build Steps */}
+                                {step === 3 && (
                                     <div className="space-y-8">
                                         <div className="text-center mb-12">
                                             <h2 className="text-4xl font-black font-display mb-3">Document the Process</h2>
@@ -220,8 +390,8 @@ export default function NewProjectPage() {
                                         </div>
                                         <div className="space-y-6">
                                             {buildSteps.map((s, i) => (
-                                                <div key={i} className="bg-card/60 border border-border rounded-[24px] p-7 relative group">
-                                                    <div className="flex items-center gap-4 mb-5">
+                                                <div key={i} className="bg-card/60 border border-border rounded-[24px] p-7 relative group flex flex-col gap-4">
+                                                    <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-lg shrink-0">{i + 1}</div>
                                                         <input value={s.title} onChange={e => updateStep(i, "title", e.target.value)} placeholder={`Step ${i + 1} title…`}
                                                             className="flex-1 bg-transparent outline-none font-black text-foreground text-lg placeholder:text-muted-foreground/40" />
@@ -231,8 +401,13 @@ export default function NewProjectPage() {
                                                             </button>
                                                         )}
                                                     </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <input value={s.time} onChange={e => updateStep(i, "time", e.target.value)} placeholder="Estimated Time (e.g. 15 mins)" className={inputCls} />
+                                                        <input value={s.imageUrl} onChange={e => updateStep(i, "imageUrl", e.target.value)} placeholder="Image URL (optional)" className={inputCls} />
+                                                    </div>
                                                     <textarea value={s.body} onChange={e => updateStep(i, "body", e.target.value)} rows={3} placeholder="Describe this step in detail…"
-                                                        className="w-full bg-transparent outline-none resize-none text-sm font-medium text-muted-foreground placeholder:text-muted-foreground/30" />
+                                                        className="w-full bg-transparent outline-none resize-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 p-4 rounded-xl border border-border bg-muted/20" />
+                                                    {s.imageUrl && <img src={s.imageUrl} alt={`Step ${i + 1}`} className="w-full h-40 object-cover rounded-xl mt-2 border border-border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                                                 </div>
                                             ))}
                                             <button onClick={addStep} className="w-full h-14 rounded-[20px] border-2 border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest">
@@ -242,8 +417,8 @@ export default function NewProjectPage() {
                                     </div>
                                 )}
 
-                                {/* Step 3: BOM */}
-                                {step === 3 && (
+                                {/* Step 4: BOM */}
+                                {step === 4 && (
                                     <div className="space-y-8">
                                         <div className="text-center mb-12">
                                             <h2 className="text-4xl font-black font-display mb-3">Bill of Materials</h2>
@@ -253,21 +428,27 @@ export default function NewProjectPage() {
                                             <table className="w-full text-left">
                                                 <thead>
                                                     <tr className="border-b border-border bg-muted/20">
-                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Component</th>
-                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Category</th>
-                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 w-20">Qty</th>
-                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Price (₹)</th>
-                                                        <th className="w-12" />
+                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 w-1/4">Component</th>
+                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Details</th>
+                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 w-16">Qty</th>
+                                                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 w-24">Price (₹)</th>
+                                                        <th className="w-10" />
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-border">
                                                     {bomRows.map((r, i) => (
-                                                        <tr key={i}>
-                                                            <td className="px-5 py-3"><input value={r.name} onChange={e => updateBOMRow(i, "name", e.target.value)} placeholder="Component name" className="bg-transparent outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 w-full" /></td>
-                                                            <td className="px-5 py-3"><input value={r.category} onChange={e => updateBOMRow(i, "category", e.target.value)} placeholder="IC, Sensor…" className="bg-transparent outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 w-full" /></td>
-                                                            <td className="px-5 py-3"><input type="number" min={1} value={r.qty} onChange={e => updateBOMRow(i, "qty", parseInt(e.target.value) || 1)} className="bg-transparent outline-none text-sm font-medium text-foreground w-14" /></td>
-                                                            <td className="px-5 py-3"><input value={r.price} onChange={e => updateBOMRow(i, "price", e.target.value)} placeholder="0" className="bg-transparent outline-none text-sm font-medium text-primary w-full placeholder:text-muted-foreground/30" /></td>
-                                                            <td className="px-3 py-3 text-right">{bomRows.length > 1 && <button onClick={() => removeBOMRow(i)} className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-rose-500 transition-colors"><Trash2 size={13} /></button>}</td>
+                                                        <tr key={i} className="group">
+                                                            <td className="px-5 py-3 align-top">
+                                                                <input value={r.name} onChange={e => updateBOMRow(i, "name", e.target.value)} placeholder="Component name" className="bg-transparent outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 w-full mb-2" />
+                                                                <input value={r.category} onChange={e => updateBOMRow(i, "category", e.target.value)} placeholder="Category (e.g. Sensor)" className="bg-transparent outline-none text-[11px] font-medium text-muted-foreground w-full" />
+                                                            </td>
+                                                            <td className="px-5 py-3 align-top">
+                                                                <input value={r.supplier} onChange={e => updateBOMRow(i, "supplier", e.target.value)} placeholder="Supplier (e.g. Digikey)" className="bg-transparent outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 w-full mb-2" />
+                                                                <input value={r.link} onChange={e => updateBOMRow(i, "link", e.target.value)} placeholder="URL Link" className="bg-transparent outline-none text-[11px] font-medium text-primary w-full placeholder:text-primary/30" />
+                                                            </td>
+                                                            <td className="px-5 py-3 align-top"><input type="number" min={1} value={r.qty} onChange={e => updateBOMRow(i, "qty", parseInt(e.target.value) || 1)} className="bg-transparent outline-none text-sm font-medium text-foreground w-full" /></td>
+                                                            <td className="px-5 py-3 align-top"><input value={r.price} onChange={e => updateBOMRow(i, "price", e.target.value)} placeholder="0.00" className="bg-transparent outline-none text-sm font-medium text-primary w-full placeholder:text-muted-foreground/30" /></td>
+                                                            <td className="px-3 py-3 align-top text-right">{bomRows.length > 1 && <button onClick={() => removeBOMRow(i)} className="pt-1 p-1.5 rounded-lg text-muted-foreground/40 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -285,8 +466,90 @@ export default function NewProjectPage() {
                                     </div>
                                 )}
 
-                                {/* Step 4: Code */}
-                                {step === 4 && (
+                                {/* Step 5: Schematics */}
+                                {step === 5 && (
+                                    <div className="space-y-8">
+                                        <div className="text-center mb-12">
+                                            <h2 className="text-4xl font-black font-display mb-3">Schematics & PCB</h2>
+                                            <p className="text-muted-foreground font-medium">Upload circuit diagrams, stackup, and design rules.</p>
+                                        </div>
+
+                                        {/* Diagrams */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Diagrams</h3>
+                                                <button onClick={() => setSchematics([...schematics, { name: "", tag: "logic", tool: "", layers: "", desc: "", img: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Diagram</button>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {schematics.map((s, i) => (
+                                                    <div key={i} className="p-4 rounded-2xl bg-muted/20 border border-border relative group flex flex-col gap-3">
+                                                        <button onClick={() => setSchematics(schematics.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                                                        <div className="grid grid-cols-2 gap-3 pr-8">
+                                                            <input value={s.name} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Diagram Name" className={inputCls} />
+                                                            <input value={s.img} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, img: e.target.value } : x))} placeholder="Image URL" className={inputCls} />
+                                                            <input value={s.desc} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, desc: e.target.value } : x))} placeholder="Description" className={`${inputCls} col-span-2`} />
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            <select value={s.tag} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, tag: e.target.value } : x))} className={`${inputCls} appearance-none`}>
+                                                                <option value="logic">Logic</option>
+                                                                <option value="power">Power</option>
+                                                                <option value="wiring">Wiring</option>
+                                                                <option value="arch">Architecture</option>
+                                                            </select>
+                                                            <input value={s.tool} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, tool: e.target.value } : x))} placeholder="Tool (e.g. KiCad)" className={inputCls} />
+                                                            <input value={s.layers} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, layers: e.target.value } : x))} placeholder="Layers (e.g. 2-Layer)" className={inputCls} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {schematics.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-4">No diagrams added yet.</p>}
+                                            </div>
+                                        </div>
+
+                                        {/* Stackup */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">PCB Stackup</h3>
+                                                <button onClick={() => setPcbLayers([...pcbLayers, { num: "", color: "#22c55e", type: "", weight: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Layer</button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {pcbLayers.map((l, i) => (
+                                                    <div key={i} className="flex gap-2 items-center">
+                                                        <input value={l.num} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, num: e.target.value } : x))} placeholder="Name (F.Cu)" className={`${inputCls} flex-1`} />
+                                                        <input type="color" value={l.color} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, color: e.target.value } : x))} className="w-12 h-12 rounded-xl p-1 bg-muted/40 border border-border cursor-pointer appearance-none shrink-0" />
+                                                        <input value={l.type} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))} placeholder="Type (Signal)" className={`${inputCls} flex-[2]`} />
+                                                        <input value={l.weight} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, weight: e.target.value } : x))} placeholder="Weight" className={`${inputCls} w-24`} />
+                                                        <button onClick={() => setPcbLayers(pcbLayers.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Rules */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Design Rules</h3>
+                                                <button onClick={() => setDesignRules([...designRules, { rule: "", value: "", status: "pass" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Rule</button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {designRules.map((r, i) => (
+                                                    <div key={i} className="flex gap-2 items-center">
+                                                        <select value={r.status} onChange={e => setDesignRules(designRules.map((x, idx) => idx === i ? { ...x, status: e.target.value } : x))} className={`${inputCls} w-32 appearance-none`}>
+                                                            <option value="pass">Pass</option>
+                                                            <option value="fail">Fail</option>
+                                                            <option value="n/a">N/A</option>
+                                                        </select>
+                                                        <input value={r.rule} onChange={e => setDesignRules(designRules.map((x, idx) => idx === i ? { ...x, rule: e.target.value } : x))} placeholder="Rule (Min clearance)" className={`${inputCls} flex-1`} />
+                                                        <input value={r.value} onChange={e => setDesignRules(designRules.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))} placeholder="Value (0.2mm)" className={`${inputCls} w-32`} />
+                                                        <button onClick={() => setDesignRules(designRules.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 6: Code */}
+                                {step === 6 && (
                                     <div className="space-y-8">
                                         <div className="text-center mb-12">
                                             <h2 className="text-4xl font-black font-display mb-3">Upload Firmware / Code</h2>
@@ -296,30 +559,107 @@ export default function NewProjectPage() {
                                             <label className={labelCls}>Language</label>
                                             <div className="flex gap-2 mb-6">
                                                 {["cpp", "python", "verilog", "javascript", "c"].map(l => (
-                                                    <button key={l} onClick={() => setCodeLang(l)}
-                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${codeLang === l ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
+                                                    <button key={l} onClick={() => updateCodeFile(activeFileId, "language", l)}
+                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeFile.language === l ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
                                                         {l}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="bg-[#0A0A0A] rounded-[28px] border border-white/10 overflow-hidden">
-                                            <div className="px-6 py-4 border-b border-white/10 bg-white/5 flex items-center gap-4">
-                                                <div className="flex gap-2">
-                                                    <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-                                                    <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-                                                    <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                                                </div>
-                                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">main.{codeLang === "cpp" ? "cpp" : codeLang === "python" ? "py" : codeLang === "verilog" ? "v" : codeLang === "javascript" ? "js" : "c"}</span>
+                                            <div className="border-b border-white/10 bg-white/5 flex items-center overflow-x-auto">
+                                                {codeFiles.map((f) => (
+                                                    <div key={f.id} onClick={() => setActiveFileId(f.id)}
+                                                        className={`group flex items-center gap-3 px-5 py-4 border-r border-white/10 cursor-pointer transition-colors ${activeFileId === f.id ? "bg-white/10 text-emerald-400" : "text-white/40 hover:text-white hover:bg-white/5"}`}>
+                                                        <div className="flex gap-1.5 shrink-0">
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                                                        </div>
+                                                        <input value={f.name} onChange={(e) => updateCodeFile(f.id, "name", e.target.value)}
+                                                            className={`bg-transparent outline-none text-[11px] font-black tracking-widest w-24 focus:w-32 transition-all ${activeFileId === f.id ? "text-emerald-400" : "text-white/40 group-hover:text-white"}`} />
+                                                        {codeFiles.length > 1 && (
+                                                            <button onClick={(e) => removeCodeFile(f.id, e)} className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-rose-400 transition-colors shrink-0"><Trash2 size={11} /></button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                <button onClick={addCodeFile} className="px-4 py-4 text-white/40 hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <Plus size={16} />
+                                                </button>
                                             </div>
-                                            <textarea value={code} onChange={e => setCode(e.target.value)} rows={18} placeholder={`// Write or paste your ${codeLang} code here…\n`}
+                                            <textarea value={activeFile.content} onChange={e => updateCodeFile(activeFileId, "content", e.target.value)} rows={18} placeholder={`// Write or paste your ${activeFile.language} code here…\n`}
                                                 className="w-full bg-transparent px-8 py-6 font-mono text-sm text-emerald-400/90 outline-none resize-none placeholder:text-white/20 leading-relaxed" />
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Step 5: Publish */}
-                                {step === 5 && (
+                                {/* Step 7: Media */}
+                                {step === 7 && (
+                                    <div className="space-y-8">
+                                        <div className="text-center mb-12">
+                                            <h2 className="text-4xl font-black font-display mb-3">Media & Downloads</h2>
+                                            <p className="text-muted-foreground font-medium">Add photos, videos, and attach downloadable files.</p>
+                                        </div>
+
+                                        {/* Gallery */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <label className={labelCls}>Photo Gallery URLs</label>
+                                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                                {galleryImages.map((img, i) => (
+                                                    <div key={i} className="relative aspect-video rounded-xl bg-muted border border-border overflow-hidden group">
+                                                        <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                                        <button onClick={() => setGalleryImages(galleryImages.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500"><Trash2 size={12} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <input value={galleryInput} onChange={e => setGalleryInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && galleryInput.trim()) { setGalleryImages([...galleryImages, galleryInput.trim()]); setGalleryInput(""); } }} placeholder="https://..." className={`${inputCls} flex-1`} />
+                                                <button onClick={() => { if (galleryInput.trim()) { setGalleryImages([...galleryImages, galleryInput.trim()]); setGalleryInput(""); } }} className="px-5 h-12 rounded-2xl bg-muted/50 border border-border text-foreground font-black text-[10px] uppercase tracking-widest hover:border-primary/50 hover:text-primary transition-all flex items-center gap-2"><Plus size={15} /> Add</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Videos */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Videos (YouTube, Vimeo, etc)</h3>
+                                                <button onClick={() => setVideos([...videos, { title: "", url: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Video</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {videos.map((v, i) => (
+                                                    <div key={i} className="flex gap-3 items-center">
+                                                        <input value={v.title} onChange={e => setVideos(videos.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Video Title" className={`${inputCls} flex-[1]`} />
+                                                        <input value={v.url} onChange={e => setVideos(videos.map((x, idx) => idx === i ? { ...x, url: e.target.value } : x))} placeholder="Video URL" className={`${inputCls} flex-[2]`} />
+                                                        <button onClick={() => setVideos(videos.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                                {videos.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-2">No videos added.</p>}
+                                            </div>
+                                        </div>
+
+                                        {/* Downloads */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Downloadable Files</h3>
+                                                <button onClick={() => setDownloads([...downloads, { name: "", size: "", fmt: "", url: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add File</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {downloads.map((d, i) => (
+                                                    <div key={i} className="flex gap-2 items-center bg-muted/20 p-2 border border-border rounded-xl">
+                                                        <input value={d.name} onChange={e => setDownloads(downloads.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="File Name" className={`${inputCls} bg-transparent border-none flex-[2] h-10 px-3`} />
+                                                        <input value={d.size} onChange={e => setDownloads(downloads.map((x, idx) => idx === i ? { ...x, size: e.target.value } : x))} placeholder="Size (e.g. 2MB)" className={`${inputCls} bg-transparent border-none flex-1 h-10 px-3`} />
+                                                        <input value={d.fmt} onChange={e => setDownloads(downloads.map((x, idx) => idx === i ? { ...x, fmt: e.target.value } : x))} placeholder="Format (PDF)" className={`${inputCls} bg-transparent border-none flex-1 h-10 px-3 uppercase`} />
+                                                        <input value={d.url} onChange={e => setDownloads(downloads.map((x, idx) => idx === i ? { ...x, url: e.target.value } : x))} placeholder="File URL" className={`${inputCls} bg-transparent border-none flex-[2] h-10 px-3`} />
+                                                        <button onClick={() => setDownloads(downloads.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                                {downloads.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-2">No files attached.</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 8: Publish */}
+                                {step === 8 && (
                                     <div className="space-y-8">
                                         <div className="text-center mb-12">
                                             <h2 className="text-4xl font-black font-display mb-3">Review & Publish</h2>
@@ -344,7 +684,7 @@ export default function NewProjectPage() {
                                                 <div className="mt-5 pt-5 border-t border-border grid grid-cols-2 gap-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">
                                                     <span>{buildSteps.filter(s => s.title).length} build steps</span>
                                                     <span>{bomRows.filter(r => r.name).length} BOM items</span>
-                                                    <span>{code.split("\n").length} lines of code</span>
+                                                    <span>{codeFiles.reduce((sum, f) => sum + (f.content.split("\n").length || 0), 0)} lines of code</span>
                                                     <span>@{authUser?.username}</span>
                                                 </div>
                                             </div>
@@ -375,7 +715,7 @@ export default function NewProjectPage() {
                         </AnimatePresence>
 
                         {/* Navigation */}
-                        {step < 5 && (
+                        {step < 8 && (
                             <div className="flex justify-between mt-14">
                                 <Button variant="ghost" onClick={() => setStep(s => s - 1)} disabled={step === 1} icon={<ArrowLeft size={16} />}
                                     className="h-14 px-8 rounded-[20px] border border-border bg-muted/30 font-black uppercase tracking-widest disabled:opacity-30">

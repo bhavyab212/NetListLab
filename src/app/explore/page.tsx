@@ -6,10 +6,11 @@ import {
   ChevronDown, Filter, Star, MessageSquare, Bell, Plus,
   ArrowRight, GitFork, Download, Share2, ExternalLink,
   Flame, LayoutGrid, History, Menu, X, Sun, Moon,
-  ArrowUpDown, TrendingUp, Clock, Zap,
+  ArrowUpDown, TrendingUp, Clock, Zap, Bookmark
 } from "lucide-react";
-import { projects, Project } from "@/mockData/projects";
-import { mockNotifications } from "@/mockData/notifications";
+import { useProjectsStore } from "@/stores/projectsStore";
+import { type Project } from "@/mockData/projects";
+import { useNotificationStore } from "@/stores/notificationStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,13 +24,15 @@ import Link from "next/link";
 
 /* ─── Project Card ─── */
 const ProjectCard = ({ project }: { project: Project }) => {
-  const [isStarred, setIsStarred] = useState(false);
-  const [starCount, setStarCount] = useState(project.stars);
+  const { starredIds, toggleStar, bookmarkedIds, toggleBookmark } = useProjectsStore();
+  const { user: authUser } = useAuthStore();
+  const isStarred = starredIds.has(project.id);
+  const isBookmarked = bookmarkedIds.has(project.id);
+  const starCount = project.stars;
 
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsStarred(!isStarred);
-    setStarCount(prev => isStarred ? prev - 1 : prev + 1);
+    toggleStar(project.id);
     toast.success(isStarred ? "Removed from library" : "Project starred!", {
       description: isStarred ? `Removed ${project.title}` : `Added ${project.title} to your library.`,
     });
@@ -155,13 +158,7 @@ const NotificationDot = ({ type }: { type: string }) => {
 };
 
 const NotificationsDropdown = ({ onClose }: { onClose: () => void }) => {
-  const [notifs, setNotifs] = useState(() =>
-    mockNotifications.map(n => ({ ...n }))
-  );
-  const unread = notifs.filter(n => !n.read).length;
-
-  const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-  const clearAll = () => setNotifs([]);
+  const { notifications: notifs, unreadCount: unread, markAllRead, clearAll, markAsRead } = useNotificationStore();
 
   const timeAgo = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime();
@@ -200,7 +197,7 @@ const NotificationsDropdown = ({ onClose }: { onClose: () => void }) => {
         ) : (
           notifs.map(n => (
             <div key={n.id} className={`flex items-start gap-4 px-6 py-4 border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer ${!n.read ? "bg-primary/5" : ""}`}
-              onClick={() => setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}>
+              onClick={() => { if (!n.read) markAsRead(n.id); }}>
               <img src={n.actorAvatar} alt={n.actor} className="w-9 h-9 rounded-full object-cover border border-border shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-foreground leading-snug">
@@ -226,6 +223,12 @@ const NotificationsDropdown = ({ onClose }: { onClose: () => void }) => {
 export default function ExplorePage() {
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, logout, user: authUser } = useAuthStore();
+  const { projects } = useProjectsStore();
+  const { unreadCount: unreadNotifs } = useNotificationStore();
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [difficulty, setDifficulty] = useState("Any");
@@ -284,12 +287,11 @@ export default function ExplorePage() {
     const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
       p.author.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchDiff = difficulty === "Any" || p.level.toLowerCase() === difficulty.toLowerCase();
+    const matchDiff = difficulty === "Any" || (p.level && p.level.toLowerCase() === difficulty.toLowerCase());
     return matchCat && matchSearch && matchDiff;
   });
 
   const featuredProject = sorted[0];
-  const unreadCount = mockNotifications.filter(n => !n.read).length;
 
   const handleCreate = () => {
     if (!isAuthenticated) {
@@ -352,7 +354,7 @@ export default function ExplorePage() {
                   <div ref={notifRef} className="relative hidden sm:block">
                     <button onClick={() => setNotifOpen(!notifOpen)} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all relative group">
                       <Bell size={17} className="group-hover:animate-bounce" />
-                      {unreadCount > 0 && (
+                      {unreadNotifs > 0 && (
                         <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-card" />
                       )}
                     </button>

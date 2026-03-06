@@ -10,11 +10,11 @@ import {
   Search, Copy, Film, Youtube, Image as ImageIcon, X, Play,
   FileText, Package, Maximize2, Tv2, Cpu as ChipIcon, Globe
 } from "lucide-react";
-import { projects } from "@/mockData/projects";
 import { getCommentsByProjectId, Comment } from "@/mockData/comments";
 import { getBOMByProjectId } from "@/mockData/bom";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useProjectsStore } from "@/stores/projectsStore";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -835,6 +835,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, user: authUser } = useAuthStore();
+  const { forkProject, projects } = useProjectsStore();
   const project = projects.find(p => p.id === parseInt(id));
   const [activeTab, setActiveTab] = useState("overview");
   const [isStarred, setIsStarred] = useState(false);
@@ -890,7 +891,17 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     });
   };
 
-  const handleFork = () => toast.success("Workspace Created", { description: `Forked ${project.title} to your lab.` });
+  const handleFork = () => {
+    if (!authUser) {
+      toast.error("Sign in to fork projects");
+      return;
+    }
+    const newId = forkProject(project!.id, authUser.id, `@${authUser.username}`, authUser.avatar);
+    toast.success("Workspace Created", { description: `Forked ${project?.title} to your lab.` });
+    if (newId) {
+      router.push(`/project/${newId}`);
+    }
+  };
   const handleShare = () => toast.info("Link Copied", { description: "Sharing link copied to clipboard." });
 
   const handlePostComment = () => {
@@ -2204,8 +2215,8 @@ MIT — fork freely, credit appreciated.`,
                         {mediaSections.map(s => (
                           <button key={s.id} onClick={() => setMediaSection(s.id as typeof mediaSection)}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border ${mediaSection === s.id
-                                ? "bg-primary/10 border-primary/30 text-primary shadow-sm"
-                                : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                              ? "bg-primary/10 border-primary/30 text-primary shadow-sm"
+                              : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                               }`}>
                             <s.icon size={14} />{s.label}
                           </button>
@@ -2378,8 +2389,8 @@ MIT — fork freely, credit appreciated.`,
                                       </div>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${log.tag === "Release" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                                        log.tag === "Bug" ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
-                                          "bg-primary/10 border-primary/30 text-primary"
+                                      log.tag === "Bug" ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
+                                        "bg-primary/10 border-primary/30 text-primary"
                                       }`}>{log.tag}</span>
                                   </div>
                                   <h4 className="text-base font-black mb-3">{log.title}</h4>

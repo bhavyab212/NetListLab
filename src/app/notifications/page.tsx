@@ -5,7 +5,8 @@ import {
     ArrowLeft, Bell, Check, Trash2, Star, GitFork, MessageSquare,
     UserPlus, Reply, Sun, Moon, Inbox
 } from "lucide-react";
-import { mockNotifications, Notification } from "@/mockData/notifications";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { type Notification } from "@/mockData/notifications";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,23 +38,23 @@ export default function NotificationsPage() {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated } = useAuthStore();
     const router = useRouter();
-    const [notifs, setNotifs] = useState<Notification[]>(mockNotifications.map(n => ({ ...n })));
+    const { notifications: notifs, unreadCount, markAllRead, markAsRead, deleteNotification, clearAll } = useNotificationStore();
     const [filter, setFilter] = useState("all");
 
-    useEffect(() => {
-        if (!isAuthenticated) router.push("/login");
-    }, [isAuthenticated, router]);
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => setIsMounted(true), []);
 
-    const unreadCount = notifs.filter(n => !n.read).length;
+    useEffect(() => {
+        if (isMounted && !isAuthenticated) router.push("/login");
+    }, [isMounted, isAuthenticated, router]);
+
     const filters = ["all", "star", "fork", "comment", "follow", "reply"];
     const visible = filter === "all" ? notifs : notifs.filter(n => n.type === filter);
 
-    const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-    const markRead = (id: string) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    const clear = (id: string) => setNotifs(prev => prev.filter(n => n.id !== id));
-    const clearAll = () => setNotifs([]);
+    const markRead = (id: string) => markAsRead(id);
+    const clear = (id: string) => deleteNotification(id);
 
-    if (!isAuthenticated) return null;
+    if (!isMounted || !isAuthenticated) return null;
 
     return (
         <div className={isDark ? "dark" : ""}>

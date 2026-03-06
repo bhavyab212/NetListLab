@@ -257,7 +257,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                         <div className="col-span-full py-32 flex flex-col items-center text-center border-2 border-dashed border-muted rounded-[40px]">
                           <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-6"><Cpu size={28} className="text-muted-foreground/20" /></div>
                           <h3 className="text-2xl font-black font-display mb-3">No artifacts documented</h3>
-                          <p className="text-muted-foreground max-w-sm font-medium">This builder hasn't published any engineering records yet.</p>
+                          <p className="text-muted-foreground max-w-sm font-medium">This builder hasn&apos;t published any engineering records yet.</p>
                         </div>
                       )}
                     </div>
