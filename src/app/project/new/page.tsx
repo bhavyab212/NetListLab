@@ -64,6 +64,9 @@ export default function NewProjectPage() {
     const [designDecisions, setDesignDecisions] = useState<{ q: string, a: string }[]>([]);
     const [githubUrl, setGithubUrl] = useState("");
     const [docsUrl, setDocsUrl] = useState("");
+    const [version, setVersion] = useState("");
+    const [license, setLicense] = useState("");
+    const [safetyNotice, setSafetyNotice] = useState("");
 
     // Step 3 State
     const [buildSteps, setBuildSteps] = useState<BuildStep[]>([{ title: "", body: "", time: "", imageUrl: "" }]);
@@ -74,16 +77,25 @@ export default function NewProjectPage() {
     // Step 5 State
     const [schematics, setSchematics] = useState<{ name: string, tag: string, tool: string, layers: string, desc: string, img: string }[]>([]);
     const [pcbLayers, setPcbLayers] = useState<{ num: string, color: string, type: string, weight: string }[]>([]);
+    const [pcbBoardSpecs, setPcbBoardSpecs] = useState({ material: "", thickness: "", finish: "", silkscreen: "", soldermask: "", minTrace: "" });
     const [designRules, setDesignRules] = useState<{ rule: string, value: string, status: string }[]>([]);
+    const [signalNotes, setSignalNotes] = useState<string[]>([]);
+    const [signalInput, setSignalInput] = useState("");
 
     // Step 6 State
     const [codeFiles, setCodeFiles] = useState<CodeFile[]>([{ id: "1", name: "main.cpp", language: "cpp", content: "" }]);
     const [activeFileId, setActiveFileId] = useState("1");
+    const [dependencies, setDependencies] = useState<{ name: string, ver: string, license: string, desc: string }[]>([]);
+    const [buildInstructions, setBuildInstructions] = useState<{ step: string, cmd: string, note: string }[]>([]);
+    const [envSetup, setEnvSetup] = useState<{ title: string, items: string[] }[]>([]);
+    const [testSuite, setTestSuite] = useState<{ name: string, file: string, status: string, ms: string, desc: string }[]>([]);
 
     // Step 7 State
     const [galleryImages, setGalleryImages] = useState<string[]>([]);
     const [galleryInput, setGalleryInput] = useState("");
     const [videos, setVideos] = useState<{ title: string, url: string }[]>([]);
+    const [simulations, setSimulations] = useState<{ title: string, desc: string, url: string, icon: string, badge: string }[]>([]);
+    const [buildLogs, setBuildLogs] = useState<{ date: string, title: string, body: string, tag: string, images: string[] }[]>([]);
     const [downloads, setDownloads] = useState<{ name: string, size: string, fmt: string, url: string }[]>([]);
 
     // Step 8 State
@@ -160,11 +172,22 @@ export default function NewProjectPage() {
             objectives,
             githubUrl,
             docsUrl,
+            version,
+            license,
+            safetyNotice,
             schematics,
             pcbLayers,
+            pcbBoardSpecs,
             designRules,
-            galleryImages,
+            signalNotes,
+            dependencies,
+            buildInstructions,
+            envSetup,
+            testSuite,
+            galleryImages: galleryImages.map(url => ({ url, caption: "", label: "" })),
             videos,
+            simulations,
+            buildLogs,
             downloads,
             createdAt: new Date().toISOString()
         });
@@ -302,6 +325,21 @@ export default function NewProjectPage() {
                                             <p className="text-muted-foreground font-medium">Add requirements, rationale, and external links.</p>
                                         </div>
                                         <div className="space-y-6">
+                                            <div className="grid grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className={labelCls}>Version (e.g. v1.0.0)</label>
+                                                    <input value={version} onChange={e => setVersion(e.target.value)} className={inputCls} />
+                                                </div>
+                                                <div>
+                                                    <label className={labelCls}>License (e.g. MIT)</label>
+                                                    <input value={license} onChange={e => setLicense(e.target.value)} className={inputCls} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className={labelCls}>Safety Notice</label>
+                                                <textarea value={safetyNotice} onChange={e => setSafetyNotice(e.target.value)} rows={2} placeholder="e.g. High voltage present. Proceed with caution."
+                                                    className="w-full px-5 py-4 rounded-2xl bg-muted/40 border border-border focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40 resize-none" />
+                                            </div>
                                             {/* Prerequisites */}
                                             <div>
                                                 <label className={labelCls}>Prerequisites</label>
@@ -508,8 +546,16 @@ export default function NewProjectPage() {
                                         {/* Stackup */}
                                         <div className="bg-card/60 p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">PCB Stackup</h3>
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">PCB Stackup & Layers</h3>
                                                 <button onClick={() => setPcbLayers([...pcbLayers, { num: "", color: "#22c55e", type: "", weight: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Layer</button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 mb-4 p-4 rounded-xl border border-border bg-muted/10">
+                                                <input value={pcbBoardSpecs?.material} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, material: e.target.value })} placeholder="Material (e.g. FR4-TG150)" className={inputCls} />
+                                                <input value={pcbBoardSpecs?.thickness} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, thickness: e.target.value })} placeholder="Thickness (e.g. 1.6mm)" className={inputCls} />
+                                                <input value={pcbBoardSpecs?.finish} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, finish: e.target.value })} placeholder="Finish (ENIG)" className={inputCls} />
+                                                <input value={pcbBoardSpecs?.silkscreen} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, silkscreen: e.target.value })} placeholder="Silkscreen (White)" className={inputCls} />
+                                                <input value={pcbBoardSpecs?.soldermask} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, soldermask: e.target.value })} placeholder="Soldermask (Matte Black)" className={inputCls} />
+                                                <input value={pcbBoardSpecs?.minTrace} onChange={e => setPcbBoardSpecs({ ...pcbBoardSpecs, minTrace: e.target.value })} placeholder="Min Trace/Space (4/4 mil)" className={inputCls} />
                                             </div>
                                             <div className="space-y-2">
                                                 {pcbLayers.map((l, i) => (
@@ -590,6 +636,84 @@ export default function NewProjectPage() {
                                             <textarea value={activeFile.content} onChange={e => updateCodeFile(activeFileId, "content", e.target.value)} rows={18} placeholder={`// Write or paste your ${activeFile.language} code here…\n`}
                                                 className="w-full bg-transparent px-8 py-6 font-mono text-sm text-emerald-400/90 outline-none resize-none placeholder:text-white/20 leading-relaxed" />
                                         </div>
+
+                                        {/* Environment Setup */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Environment Setup</h3>
+                                                <button onClick={() => setEnvSetup([...envSetup, { title: "", items: [] }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Group</button>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {envSetup.map((env, i) => (
+                                                    <div key={i} className="p-4 rounded-xl bg-muted/20 border border-border relative group">
+                                                        <button onClick={() => setEnvSetup(envSetup.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                                                        <input value={env.title} onChange={e => setEnvSetup(envSetup.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Group Title (e.g. Compiler)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/40" />
+                                                        <input value={env.items.join(", ")} onChange={e => setEnvSetup(envSetup.map((x, idx) => idx === i ? { ...x, items: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } : x))} placeholder="Items (comma separated)" className="w-full bg-transparent outline-none text-sm text-foreground/80 placeholder:text-muted-foreground/30" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Dependencies */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Dependencies</h3>
+                                                <button onClick={() => setDependencies([...dependencies, { name: "", ver: "", license: "", desc: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Dependency</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {dependencies.map((dep, i) => (
+                                                    <div key={i} className="flex gap-2 items-center">
+                                                        <input value={dep.name} onChange={e => setDependencies(dependencies.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Name (e.g. React)" className={`${inputCls} flex-[2]`} />
+                                                        <input value={dep.ver} onChange={e => setDependencies(dependencies.map((x, idx) => idx === i ? { ...x, ver: e.target.value } : x))} placeholder="Version (e.g. ^18.0.0)" className={`${inputCls} flex-1`} />
+                                                        <input value={dep.license} onChange={e => setDependencies(dependencies.map((x, idx) => idx === i ? { ...x, license: e.target.value } : x))} placeholder="License (MIT)" className={`${inputCls} flex-1`} />
+                                                        <input value={dep.desc} onChange={e => setDependencies(dependencies.map((x, idx) => idx === i ? { ...x, desc: e.target.value } : x))} placeholder="Description" className={`${inputCls} flex-[3]`} />
+                                                        <button onClick={() => setDependencies(dependencies.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Build Instructions */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Build Instructions</h3>
+                                                <button onClick={() => setBuildInstructions([...buildInstructions, { step: "", cmd: "", note: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Command</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {buildInstructions.map((b, i) => (
+                                                    <div key={i} className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-muted/10 relative group">
+                                                        <button onClick={() => setBuildInstructions(buildInstructions.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                                                        <input value={b.step} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, step: e.target.value } : x))} placeholder="Step Name (e.g. Install dependencies)" className="w-1/2 bg-transparent outline-none font-bold text-sm mb-1 placeholder:text-muted-foreground/40" />
+                                                        <input value={b.cmd} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, cmd: e.target.value } : x))} placeholder="Command (e.g. npm run build)" className="w-full font-mono text-sm text-emerald-400 bg-black/20 p-2 rounded-lg outline-none placeholder:text-emerald-400/20" />
+                                                        <input value={b.note} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, note: e.target.value } : x))} placeholder="Note (e.g. Takes about 2 minutes)" className="w-full bg-transparent outline-none text-sm text-muted-foreground placeholder:text-muted-foreground/30 mt-1" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Test Suite */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Test Results & Coverage</h3>
+                                                <button onClick={() => setTestSuite([...testSuite, { name: "", file: "", status: "pass", ms: "", desc: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Test</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {testSuite.map((t, i) => (
+                                                    <div key={i} className="flex gap-2 items-center flex-wrap md:flex-nowrap p-3 rounded-xl border border-border bg-muted/10 relative group">
+                                                        <select value={t.status} onChange={e => setTestSuite(testSuite.map((x, idx) => idx === i ? { ...x, status: e.target.value } : x))} className={`${inputCls} w-24 appearance-none p-2 h-10`}>
+                                                            <option value="pass">Pass</option>
+                                                            <option value="fail">Fail</option>
+                                                            <option value="skip">Skip</option>
+                                                        </select>
+                                                        <input value={t.name} onChange={e => setTestSuite(testSuite.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Test Name" className={`${inputCls} flex-[2] h-10`} />
+                                                        <input value={t.file} onChange={e => setTestSuite(testSuite.map((x, idx) => idx === i ? { ...x, file: e.target.value } : x))} placeholder="File (test_foo.py)" className={`${inputCls} flex-[2] h-10 font-mono text-xs`} />
+                                                        <input value={t.ms} onChange={e => setTestSuite(testSuite.map((x, idx) => idx === i ? { ...x, ms: e.target.value } : x))} placeholder="ms" className={`${inputCls} w-20 h-10`} />
+                                                        <input value={t.desc} onChange={e => setTestSuite(testSuite.map((x, idx) => idx === i ? { ...x, desc: e.target.value } : x))} placeholder="Description" className={`${inputCls} w-full md:flex-[3] h-10 mt-2 md:mt-0`} />
+                                                        <button onClick={() => setTestSuite(testSuite.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={12} /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
@@ -633,6 +757,50 @@ export default function NewProjectPage() {
                                                     </div>
                                                 ))}
                                                 {videos.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-2">No videos added.</p>}
+                                            </div>
+                                        </div>
+
+
+                                        {/* Simulations */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Interactive Simulations</h3>
+                                                <button onClick={() => setSimulations([...simulations, { title: "", desc: "", url: "", icon: "🔬", badge: "Sim" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Sim</button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {simulations.map((sim, i) => (
+                                                    <div key={i} className="flex gap-2 items-center flex-wrap md:flex-nowrap p-3 rounded-xl border border-border bg-muted/10 relative group">
+                                                        <input value={sim.icon} onChange={e => setSimulations(simulations.map((x, idx) => idx === i ? { ...x, icon: e.target.value } : x))} placeholder="🔬" className={`${inputCls} w-16 h-10 text-center`} />
+                                                        <input value={sim.title} onChange={e => setSimulations(simulations.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Title (e.g. Wokwi ESP32)" className={`${inputCls} flex-[2] h-10`} />
+                                                        <input value={sim.url} onChange={e => setSimulations(simulations.map((x, idx) => idx === i ? { ...x, url: e.target.value } : x))} placeholder="URL Link" className={`${inputCls} flex-[3] h-10`} />
+                                                        <input value={sim.badge} onChange={e => setSimulations(simulations.map((x, idx) => idx === i ? { ...x, badge: e.target.value } : x))} placeholder="Badge" className={`${inputCls} w-24 h-10`} />
+                                                        <input value={sim.desc} onChange={e => setSimulations(simulations.map((x, idx) => idx === i ? { ...x, desc: e.target.value } : x))} placeholder="Description" className={`${inputCls} w-full mt-2 md:mt-0 h-10`} />
+                                                        <button onClick={() => setSimulations(simulations.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 p-1.5 rounded-full bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={12} /></button>
+                                                    </div>
+                                                ))}
+                                                {simulations.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-2">No simulations added.</p>}
+                                            </div>
+                                        </div>
+
+                                        {/* Build Logs */}
+                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Build Logs & Updates</h3>
+                                                <button onClick={() => setBuildLogs([...buildLogs, { date: new Date().toISOString().split("T")[0], title: "", body: "", tag: "Update", images: [] }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Log</button>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {buildLogs.map((log, i) => (
+                                                    <div key={i} className="p-4 rounded-xl border border-border bg-muted/10 relative group">
+                                                        <button onClick={() => setBuildLogs(buildLogs.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
+                                                        <div className="flex gap-3 mb-3 pr-8">
+                                                            <input type="date" value={log.date} onChange={e => setBuildLogs(buildLogs.map((x, idx) => idx === i ? { ...x, date: e.target.value } : x))} className={`${inputCls} w-40 h-10`} />
+                                                            <input value={log.title} onChange={e => setBuildLogs(buildLogs.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Log Title" className={`${inputCls} flex-1 h-10`} />
+                                                            <input value={log.tag} onChange={e => setBuildLogs(buildLogs.map((x, idx) => idx === i ? { ...x, tag: e.target.value } : x))} placeholder="Tag (e.g. Milestone)" className={`${inputCls} w-32 h-10`} />
+                                                        </div>
+                                                        <textarea value={log.body} onChange={e => setBuildLogs(buildLogs.map((x, idx) => idx === i ? { ...x, body: e.target.value } : x))} rows={3} placeholder="Log content..." className="w-full bg-transparent outline-none resize-none text-sm text-foreground placeholder:text-muted-foreground/30 p-4 rounded-xl border border-border bg-black/20" />
+                                                    </div>
+                                                ))}
+                                                {buildLogs.length === 0 && <p className="text-xs text-muted-foreground/50 text-center py-2">No logs added yet.</p>}
                                             </div>
                                         </div>
 
@@ -730,7 +898,7 @@ export default function NewProjectPage() {
                         )}
                     </div>
                 </main>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
