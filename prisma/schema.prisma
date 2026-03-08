@@ -1,0 +1,228 @@
+// This is your Prisma schema file for NetListLab
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── USER ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  full_name    String
+  email        String   @unique
+  avatar_url   String?
+  bio          String?  @db.VarChar(300)
+  location     String?
+  website_url  String?
+  github_url   String?
+  linkedin_url String?
+  twitter_url  String?
+  field_of_work String[]
+  skill_tags   String[]
+  current_role String?
+  institution  String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  // Relations
+  projects              Project[]
+  stars                 Star[]
+  following             Follow[]       @relation("follower")
+  followers             Follow[]       @relation("following")
+  comments              Comment[]
+  notifications_received Notification[] @relation("recipient")
+  notifications_sent    Notification[] @relation("actor")
+
+  @@map("users")
+}
+
+// ─── PROJECT ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id              String    @id @default(uuid())
+  author_id       String
+  title           String    @db.VarChar(100)
+  tagline         String?   @db.VarChar(200)
+  cover_image_url String?
+  demo_video_url  String?
+  project_type    String
+  difficulty      String
+  status          String    @default("DRAFT")
+  tags            String[]
+  view_count      Int       @default(0)
+  star_count      Int       @default(0)
+  fork_count      Int       @default(0)
+  github_url      String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  published_at    DateTime?
+
+  // Relations
+  author        User             @relation(fields: [author_id], references: [id])
+  sections      ProjectSection[]
+  media         ProjectMedia[]
+  bom_items     BOMItem[]
+  stars         Star[]
+  comments      Comment[]
+  notifications Notification[]
+  original_fork Fork?            @relation("original")
+  forked_from   Fork?            @relation("fork")
+
+  @@map("projects")
+}
+
+// ─── PROJECT SECTION ─────────────────────────────────────────────────────────
+
+model ProjectSection {
+  id               String   @id @default(uuid())
+  project_id       String
+  section_type     String   // OVERVIEW | BOM | SCHEMATIC | BUILD_STEPS | CODE | RESULT | CHALLENGES | DOWNLOADS | CUSTOM
+  title            String
+  content_markdown String?  @db.Text
+  order_index      Int
+  created_at       DateTime @default(now())
+
+  // Relations
+  project  Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  media    ProjectMedia[]
+  comments Comment[]
+
+  @@map("project_sections")
+}
+
+// ─── PROJECT MEDIA ────────────────────────────────────────────────────────────
+
+model ProjectMedia {
+  id          String  @id @default(uuid())
+  project_id  String
+  section_id  String?
+  media_type  String  // IMAGE | VIDEO | FILE | SCHEMATIC | CAD
+  file_url    String
+  caption     String?
+  order_index Int     @default(0)
+
+  // Relations
+  project Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  section ProjectSection? @relation(fields: [section_id], references: [id])
+
+  @@map("project_media")
+}
+
+// ─── BOM ITEM ─────────────────────────────────────────────────────────────────
+
+model BOMItem {
+  id              String   @id @default(uuid())
+  project_id      String
+  component_name  String
+  quantity        Int
+  description     String?
+  part_number     String?
+  buy_link        String?
+  estimated_price Decimal? @db.Decimal(10, 2)
+  currency        String   @default("INR")
+
+  // Relations
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("bom_items")
+}
+
+// ─── STAR ─────────────────────────────────────────────────────────────────────
+
+model Star {
+  id         String   @id @default(uuid())
+  user_id    String
+  project_id String
+  created_at DateTime @default(now())
+
+  // Relations
+  user    User    @relation(fields: [user_id], references: [id])
+  project Project @relation(fields: [project_id], references: [id])
+
+  @@unique([user_id, project_id])
+  @@map("stars")
+}
+
+// ─── FOLLOW ───────────────────────────────────────────────────────────────────
+
+model Follow {
+  id           String   @id @default(uuid())
+  follower_id  String
+  following_id String
+  created_at   DateTime @default(now())
+
+  // Relations
+  follower  User @relation("follower", fields: [follower_id], references: [id])
+  following User @relation("following", fields: [following_id], references: [id])
+
+  @@unique([follower_id, following_id])
+  @@map("follows")
+}
+
+// ─── COMMENT ─────────────────────────────────────────────────────────────────
+
+model Comment {
+  id                String    @id @default(uuid())
+  user_id           String
+  project_id        String
+  section_id        String?
+  parent_comment_id String?
+  content           String    @db.VarChar(1000)
+  upvote_count      Int       @default(0)
+  is_deleted        Boolean   @default(false)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  // Relations
+  user    User            @relation(fields: [user_id], references: [id])
+  project Project         @relation(fields: [project_id], references: [id])
+  section ProjectSection? @relation(fields: [section_id], references: [id])
+  parent  Comment?        @relation("replies", fields: [parent_comment_id], references: [id])
+  replies Comment[]       @relation("replies")
+
+  @@map("comments")
+}
+
+// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id           String   @id @default(uuid())
+  recipient_id String
+  actor_id     String
+  type         String   // STAR | FOLLOW | COMMENT | REPLY | FORK
+  project_id   String?
+  comment_id   String?
+  is_read      Boolean  @default(false)
+  created_at   DateTime @default(now())
+
+  // Relations
+  recipient User     @relation("recipient", fields: [recipient_id], references: [id])
+  actor     User     @relation("actor", fields: [actor_id], references: [id])
+  project   Project? @relation(fields: [project_id], references: [id])
+
+  @@map("notifications")
+}
+
+// ─── FORK ─────────────────────────────────────────────────────────────────────
+
+model Fork {
+  id                  String   @id @default(uuid())
+  original_project_id String   @unique
+  forked_project_id   String   @unique
+  forked_by_user_id   String
+  created_at          DateTime @default(now())
+
+  // Relations
+  original Project @relation("original", fields: [original_project_id], references: [id])
+  fork     Project @relation("fork", fields: [forked_project_id], references: [id])
+
+  @@map("forks")
+}
