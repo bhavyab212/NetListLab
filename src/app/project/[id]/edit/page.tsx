@@ -3,7 +3,8 @@
 import { use, useState, useEffect } from "react";
 import {
     ArrowLeft, Save, Sun, Moon, Plus, Trash2, Eye, AlertTriangle,
-    ShoppingCart, Tag, Code, FileText
+    ShoppingCart, Tag, Code, FileText,
+    Cpu, Server, Bot, Brain, Box, HardDrive, Wifi, Binary
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { useThemeStore } from "@/stores/themeStore";
@@ -18,7 +19,16 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const CATEGORIES = ["Electronics", "Hardware", "Robotics", "Software", "AI/ML"];
+const CATEGORIES = [
+    { name: "Electronics", icon: Cpu },
+    { name: "Hardware", icon: Server },
+    { name: "Robotics", icon: Bot },
+    { name: "Software", icon: Binary },
+    { name: "AI/ML", icon: Brain },
+    { name: "3D Print", icon: Box },
+    { name: "Mechanics", icon: HardDrive },
+    { name: "IoT", icon: Wifi },
+];
 const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
 interface BOMRow { name: string; category: string; qty: number; price: string; supplier: string; link: string; }
@@ -166,8 +176,8 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
 
     const activeFile = codeFiles.find(f => f.id === activeFileId) || codeFiles[0];
 
-    const inputCls = "w-full h-12 px-5 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40";
-    const labelCls = "block text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 mb-3";
+    const inputCls = "w-full h-12 px-5 rounded-2xl bg-card border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm text-foreground placeholder:text-muted-foreground/60";
+    const labelCls = "block text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-3";
 
     const sections = ["basics", "metadata", "cover", "tags", "build_steps", "bom", "schematics", "code", "media", "status"];
 
@@ -206,7 +216,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                 <div className="sticky top-32 space-y-2">
                                     {sections.map(s => (
                                         <button key={s} onClick={() => setActiveSection(s)}
-                                            className={`w-full text-left px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${activeSection === s ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/40"}`}>
+                                            className={`w-full text-left px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${activeSection === s ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-card"}`}>
                                             {s === "basics" ? "Content" : s === "metadata" ? "Metadata" : s === "cover" ? "Cover Image" : s === "tags" ? "Tech Stack" : s === "build_steps" ? "Build Steps" : s === "bom" ? "BOM" : s === "schematics" ? "Schematics" : s === "code" ? "Firmware" : s === "media" ? "Media" : "Visibility"}
                                         </button>
                                     ))}
@@ -218,7 +228,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
 
                                     {activeSection === "basics" && (
-                                        <div className="space-y-7 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-7 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Content</h2>
                                             <div>
                                                 <label className={labelCls}>Title *</label>
@@ -229,9 +239,10 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     <label className={labelCls}>Category</label>
                                                     <div className="flex flex-col gap-2">
                                                         {CATEGORIES.map(c => (
-                                                            <button key={c} onClick={() => { setCategory(c); setIsDirty(true); }}
-                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${category === c ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
-                                                                {c}
+                                                            <button key={c.name} onClick={() => { setCategory(c.name); setIsDirty(true); }}
+                                                                className={`py-2 flex items-center justify-center gap-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${category === c.name ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"}`}>
+                                                                <c.icon size={14} className={category === c.name ? "animate-pulse" : ""} />
+                                                                {c.name}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -241,7 +252,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     <div className="flex flex-col gap-2">
                                                         {DIFFICULTIES.map(d => (
                                                             <button key={d} onClick={() => { setDifficulty(d); setIsDirty(true); }}
-                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${difficulty === d ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
+                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${difficulty === d ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"}`}>
                                                                 {d}
                                                             </button>
                                                         ))}
@@ -251,13 +262,13 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                             <div>
                                                 <label className={labelCls}>Description</label>
                                                 <textarea value={description} onChange={e => { setDescription(e.target.value); setIsDirty(true); }} rows={5}
-                                                    className="w-full px-5 py-4 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40 resize-none" />
+                                                    className="w-full px-5 py-4 rounded-2xl bg-card border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/60 resize-none" />
                                             </div>
                                         </div>
                                     )}
 
                                     {activeSection === "metadata" && (
-                                        <div className="space-y-7 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-7 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Metadata</h2>
 
                                             <div className="grid grid-cols-2 gap-5">
@@ -274,7 +285,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                             <div>
                                                 <label className={labelCls}>Safety Notice</label>
                                                 <textarea value={safetyNotice} onChange={e => { setSafetyNotice(e.target.value); setIsDirty(true); }} rows={2} placeholder="e.g. High voltage present. Proceed with caution."
-                                                    className="w-full px-5 py-4 rounded-2xl bg-muted/40 border border-border focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40 resize-none" />
+                                                    className="w-full px-5 py-4 rounded-2xl bg-card border border-border focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/60 resize-none" />
                                             </div>
 
                                             {/* Prerequisites */}
@@ -333,7 +344,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     {designDecisions.map((d, i) => (
                                                         <div key={i} className="p-4 rounded-xl bg-muted/20 border border-border relative group">
                                                             <button onClick={() => { setDesignDecisions(designDecisions.filter((_, idx) => idx !== i)); setIsDirty(true); }} className="absolute top-3 right-3 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
-                                                            <input value={d.q} onChange={e => { setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, q: e.target.value } : x)); setIsDirty(true); }} placeholder="Question (e.g. Why use this MCU?)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/40" />
+                                                            <input value={d.q} onChange={e => { setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, q: e.target.value } : x)); setIsDirty(true); }} placeholder="Question (e.g. Why use this MCU?)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/60" />
                                                             <textarea value={d.a} onChange={e => { setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, a: e.target.value } : x)); setIsDirty(true); }} rows={2} placeholder="Rationale..." className="w-full bg-transparent outline-none text-sm text-foreground/80 resize-none placeholder:text-muted-foreground/30" />
                                                         </div>
                                                     ))}
@@ -356,7 +367,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "cover" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Cover Image</h2>
                                             <div>
                                                 <label className={labelCls}>Image URL</label>
@@ -372,7 +383,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "tags" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Tech Stack Tags</h2>
                                             <div className="flex flex-wrap gap-2 min-h-12">
                                                 {tags.map(t => (
@@ -391,7 +402,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "build_steps" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Build Steps</h2>
                                             <div className="space-y-6">
                                                 {buildSteps.map((s, i) => (
@@ -399,7 +410,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                         <div className="flex items-center gap-4">
                                                             <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-lg shrink-0">{i + 1}</div>
                                                             <input value={s.title} onChange={e => updateStep(i, "title", e.target.value)} placeholder={`Step ${i + 1} title…`}
-                                                                className="flex-1 bg-transparent outline-none font-black text-foreground text-lg placeholder:text-muted-foreground/40" />
+                                                                className="flex-1 bg-transparent outline-none font-black text-foreground text-lg placeholder:text-muted-foreground/60" />
                                                             {buildSteps.length > 1 && (
                                                                 <button onClick={() => removeStep(i)} className="opacity-0 group-hover:opacity-100 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 transition-all">
                                                                     <Trash2 size={14} />
@@ -423,7 +434,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "bom" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Bill of Materials</h2>
                                             <div className="bg-muted/10 border border-border rounded-[28px] overflow-hidden">
                                                 <table className="w-full text-left">
@@ -468,7 +479,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "schematics" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Schematics & PCB</h2>
 
                                             {/* Diagrams */}
@@ -520,7 +531,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     {pcbLayers.map((l, i) => (
                                                         <div key={i} className="flex gap-2 items-center">
                                                             <input value={l.num} onChange={e => { setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, num: e.target.value } : x)); setIsDirty(true); }} placeholder="Name (F.Cu)" className={`${inputCls} flex-1`} />
-                                                            <input type="color" value={l.color} onChange={e => { setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, color: e.target.value } : x)); setIsDirty(true); }} className="w-12 h-12 rounded-xl p-1 bg-muted/40 border border-border cursor-pointer appearance-none shrink-0" />
+                                                            <input type="color" value={l.color} onChange={e => { setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, color: e.target.value } : x)); setIsDirty(true); }} className="w-12 h-12 rounded-xl p-1 bg-card border border-border cursor-pointer appearance-none shrink-0" />
                                                             <input value={l.type} onChange={e => { setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x)); setIsDirty(true); }} placeholder="Type (Signal)" className={`${inputCls} flex-[2]`} />
                                                             <input value={l.weight} onChange={e => { setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, weight: e.target.value } : x)); setIsDirty(true); }} placeholder="Weight" className={`${inputCls} w-24`} />
                                                             <button onClick={() => { setPcbLayers(pcbLayers.filter((_, idx) => idx !== i)); setIsDirty(true); }} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
@@ -571,7 +582,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "code" && (
-                                        <div className="space-y-8 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-8 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Firmware & Code</h2>
 
                                             {/* Firmware Editor */}
@@ -581,7 +592,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     <div className="flex gap-2">
                                                         {["cpp", "python", "verilog", "javascript", "c"].map(l => (
                                                             <button key={l} onClick={() => updateCodeFile(activeFileId, "language", l)}
-                                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${activeFile.language === l ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
+                                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${activeFile.language === l ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"}`}>
                                                                 {l}
                                                             </button>
                                                         ))}
@@ -705,7 +716,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "media" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Media & Downloads</h2>
 
                                             {/* Gallery */}
@@ -817,7 +828,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                     )}
 
                                     {activeSection === "status" && (
-                                        <div className="space-y-6 bg-card/60 border border-border rounded-[28px] p-9">
+                                        <div className="space-y-6 bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] p-9">
                                             <h2 className="text-2xl font-black font-display mb-6">Project Visibility</h2>
                                             <div className="grid grid-cols-2 gap-5">
                                                 {[
@@ -825,7 +836,7 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
                                                     { val: "draft" as const, label: "Draft", desc: "Only visible to you. Not in public explore." },
                                                 ].map(opt => (
                                                     <button key={opt.val} onClick={() => { setStatus(opt.val); setIsDirty(true); }}
-                                                        className={`p-7 rounded-[24px] border-2 text-left transition-all ${status === opt.val ? "bg-primary/10 border-primary" : "bg-muted/40 border-border hover:border-primary/40"}`}>
+                                                        className={`p-7 rounded-[24px] border-2 text-left transition-all ${status === opt.val ? "bg-primary/10 border-primary" : "bg-card border-border hover:border-primary/40"}`}>
                                                         <div className={`w-4 h-4 rounded-full border-2 mb-4 ${status === opt.val ? "bg-primary border-primary" : "border-border"}`} />
                                                         <p className={`font-black text-base mb-1 ${status === opt.val ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
                                                         <p className="text-sm text-muted-foreground font-medium">{opt.desc}</p>
