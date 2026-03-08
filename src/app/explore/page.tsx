@@ -6,7 +6,7 @@ import {
   ChevronDown, Filter, Star, MessageSquare, Bell, Plus,
   ArrowRight, GitFork, Download, Share2, ExternalLink,
   Flame, LayoutGrid, History, Menu, X, Sun, Moon,
-  ArrowUpDown, TrendingUp, Clock, Zap, Bookmark
+  ArrowUpDown, TrendingUp, Clock, Zap, Bookmark, ArrowLeft
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { type Project } from "@/mockData/projects";
@@ -21,14 +21,16 @@ import Logo from "@/components/ui/Logo";
 import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 /* ─── Project Card ─── */
 const ProjectCard = ({ project }: { project: Project }) => {
-  const { starredIds, toggleStar, bookmarkedIds, toggleBookmark } = useProjectsStore();
-  const { user: authUser } = useAuthStore();
+  const { starredIds, toggleStar, bookmarkedIds, toggleBookmark, forkProject } = useProjectsStore();
+  const { user: authUser, isAuthenticated } = useAuthStore();
   const isStarred = starredIds.has(project.id);
   const isBookmarked = bookmarkedIds.has(project.id);
   const starCount = project.stars;
+  const router = useRouter();
 
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -52,9 +54,15 @@ const ProjectCard = ({ project }: { project: Project }) => {
 
   const handleFork = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated || !authUser) {
+      toast.error("Login Required", { description: "Please login to fork projects." });
+      return;
+    }
+    const newId = forkProject(project.id, authUser.id, `@${authUser.username}`, authUser.avatar);
     toast.success("Workspace Created", {
       description: `Forked ${project.title} to your laboratory.`,
     });
+    router.push(`/project/${newId}/edit`);
   };
 
   const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
@@ -314,9 +322,12 @@ export default function ExplorePage() {
         {/* ─── Header ─── */}
         <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
           <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-5">
+              <button onClick={() => router.back()} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
+                <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+              </button>
               <Logo size="md" />
-              <nav className="hidden xl:flex items-center gap-8">
+              <nav className="hidden xl:flex items-center gap-8 pl-3">
                 {[
                   { label: "Explore", href: "/explore" },
                   { label: "Feed", href: "/feed" },

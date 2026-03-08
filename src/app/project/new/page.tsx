@@ -12,6 +12,7 @@ import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
 import Logo from "@/components/ui/Logo";
 import Button from "@/components/ui/Button";
+import ImageUploadInput from "@/components/ui/ImageUploadInput";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -296,7 +297,7 @@ export default function NewProjectPage() {
                                             </div>
                                             <div>
                                                 <label className={labelCls}>Cover Image URL</label>
-                                                <input value={coverUrl} onChange={e => setCoverUrl(e.target.value)} placeholder="https://images.unsplash.com/…" className={inputCls} />
+                                                <ImageUploadInput value={coverUrl} onChange={setCoverUrl} placeholder="https://images.unsplash.com/…" className={inputCls} />
                                                 {coverUrl && <img src={coverUrl} alt="cover preview" className="mt-4 w-full h-48 object-cover rounded-2xl border border-border" onError={() => setCoverUrl("")} />}
                                             </div>
                                             <div>
@@ -441,7 +442,7 @@ export default function NewProjectPage() {
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <input value={s.time} onChange={e => updateStep(i, "time", e.target.value)} placeholder="Estimated Time (e.g. 15 mins)" className={inputCls} />
-                                                        <input value={s.imageUrl} onChange={e => updateStep(i, "imageUrl", e.target.value)} placeholder="Image URL (optional)" className={inputCls} />
+                                                        <ImageUploadInput value={s.imageUrl || ""} onChange={url => updateStep(i, "imageUrl", url)} placeholder="Image URL (optional)" className={inputCls} />
                                                     </div>
                                                     <textarea value={s.body} onChange={e => updateStep(i, "body", e.target.value)} rows={3} placeholder="Describe this step in detail…"
                                                         className="w-full bg-transparent outline-none resize-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 p-4 rounded-xl border border-border bg-muted/20" />
@@ -524,7 +525,7 @@ export default function NewProjectPage() {
                                                         <button onClick={() => setSchematics(schematics.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
                                                         <div className="grid grid-cols-2 gap-3 pr-8">
                                                             <input value={s.name} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Diagram Name" className={inputCls} />
-                                                            <input value={s.img} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, img: e.target.value } : x))} placeholder="Image URL" className={inputCls} />
+                                                            <ImageUploadInput value={s.img} onChange={url => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, img: url } : x))} placeholder="Image URL" className={inputCls} />
                                                             <input value={s.desc} onChange={e => setSchematics(schematics.map((x, idx) => idx === i ? { ...x, desc: e.target.value } : x))} placeholder="Description" className={`${inputCls} col-span-2`} />
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-3">

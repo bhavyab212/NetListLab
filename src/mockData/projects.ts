@@ -22,19 +22,42 @@ export interface Project {
   createdAt: string;
   status: 'published' | 'draft';
 
-  // New Fields
+  // Fork metadata
+  forkedFrom?: { projectId: number; projectTitle: string; authorId: string; author: string; };
+  forkedAt?: string;
+  lastSyncedAt?: string;
+  changesSinceSync?: number;
+
+  // Overview metadata
   prerequisites?: string[];
   tools?: string[];
   designDecisions?: { q: string; a: string }[];
   objectives?: string[];
   githubUrl?: string;
   docsUrl?: string;
-  schematics?: { name: string; tag: string; tool: string; layers: string; desc: string; img: string; }[];
+  version?: string;
+  license?: string;
+  safetyNotice?: string;
+
+  // Schematics
+  schematics?: { name: string; tag: string; tool: string; layers: string; nets?: string; erc?: string; rev?: string; size?: string; desc: string; img: string; }[];
   pcbLayers?: { num: string; color: string; type: string; weight: string; }[];
+  pcbBoardSpecs?: { material?: string; thickness?: string; finish?: string; silkscreen?: string; soldermask?: string; minTrace?: string; };
   designRules?: { rule: string; value: string; status: string; }[];
-  galleryImages?: string[];
-  videos?: { title: string; url: string }[];
-  downloads?: { name: string; size: string; fmt: string; url: string }[];
+  signalNotes?: string[];
+
+  // Code sub-panels
+  dependencies?: { name: string; ver: string; license: string; desc: string; }[];
+  buildInstructions?: { step: string; cmd: string; note: string; }[];
+  envSetup?: { title: string; items: string[]; }[];
+  testSuite?: { name: string; file: string; status: string; ms: string; desc: string; }[];
+
+  // Media
+  galleryImages?: { url: string; caption: string; label: string; }[];
+  videos?: { title: string; url: string; channel?: string; views?: string; duration?: string; desc?: string; }[];
+  simulations?: { title: string; desc: string; url: string; icon: string; badge: string; }[];
+  buildLogs?: { date: string; title: string; body: string; tag: string; images: string[]; }[];
+  downloads?: { name: string; size: string; fmt: string; url: string; desc?: string; }[];
 }
 
 export const projects: Project[] = [
@@ -58,6 +81,40 @@ export const projects: Project[] = [
     forks: 128,
     createdAt: "2026-01-15T09:00:00Z",
     status: "published",
+    prerequisites: ["Basic C++ knowledge", "Experience with ESP-IDF", "Soldering skills"],
+    tools: ["Soldering Iron", "Multimeter", "USB-UART Bridge"],
+    objectives: ["Build a low-power intrusion detector", "Process raw mmWave signals", "Publish status to MQTT"],
+    designDecisions: [{ q: "Why ESP32-S3?", a: "To utilize vector instructions for fast FFT calculations on radar data." }],
+    githubUrl: "https://github.com/tech_wizard/esp32-radar-intrusion",
+    docsUrl: "https://docs.netlistlab.dev/esp32-radar",
+    version: "v1.2.0",
+    license: "MIT",
+    safetyNotice: "Radar emits low-power RF. Ensure compliance with local regulations (FCC Part 15).",
+    bom: [
+      { name: "ESP32-S3 WROOM 1", category: "Microcontroller", qty: 1, price: "450", supplier: "Mouser", link: "https://mouser.com/esp32s3" },
+      { name: "LD2410C mmWave Radar", category: "Sensor", qty: 1, price: "350", supplier: "AliExpress", link: "https://aliexpress.com/ld2410" },
+      { name: "18650 Battery Cell 3000mAh", category: "Power", qty: 1, price: "250", supplier: "Robu", link: "https://robu.in/18650" }
+    ],
+    buildSteps: [
+      { title: "PCB Assembly", time: "30m", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80", body: "Solder the ESP32-S3 module using hot air. Then manually solder all 0603 passives." },
+      { title: "Radar Integration", time: "15m", imageUrl: "", body: "Connect TX/RX pins of LD2410C to UART2 on the ESP32. Ensure 5V stable power supply." }
+    ],
+    codeFiles: [
+      { id: "1", name: "main.cpp", language: "cpp", content: "#include <WiFi.h>\n#include \"RadarManager.h\"\n\nRadarManager radar(Serial2);\n\nvoid setup() {\n  Serial.begin(115200);\n  radar.begin();\n}\n\nvoid loop() {\n  if(radar.detectMotion()) {\n    Serial.println(\"Intrusion detected!\");\n  }\n  delay(100);\n}" }
+    ],
+    schematics: [
+      { name: "Main Logic", tag: "logic", tool: "KiCad 7", layers: "2", img: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80", desc: "ESP32 decoupling and radar interfacing schematic." }
+    ],
+    pcbLayers: [{ num: "F.Cu", color: "#eab308", type: "Signal", weight: "1oz" }, { num: "B.Cu", color: "#22c55e", type: "GND Plane", weight: "1oz" }],
+    pcbBoardSpecs: { material: "FR4-TG130", thickness: "1.6mm", finish: "HASL", silkscreen: "White", soldermask: "Green", minTrace: "6 mil" },
+    designRules: [{ rule: "Min Clearance", value: "0.2mm", status: "pass" }],
+    dependencies: [{ name: "PubSubClient", ver: "2.8", license: "MIT", desc: "MQTT client library for publishing alerts." }],
+    buildInstructions: [{ step: "Compile", cmd: "idf.py build", note: "Takes ~2 mins on first run." }],
+    envSetup: [{ title: "Toolchain", items: ["Install ESP-IDF v5.1", "Setup Python environment"] }],
+    testSuite: [{ name: "Radar UART Comm", file: "test_radar.cpp", status: "pass", ms: "45", desc: "Verifies RX/TX loopback and protocol parsing." }],
+    galleryImages: [{ url: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80", caption: "Finished prototype assembled", label: "Final Build" }],
+    simulations: [{ title: "Radar Field Sim", desc: "Antenna radiation pattern simulation", url: "https://wokwi.com", icon: "📡", badge: "HFSS" }],
+    downloads: [{ name: "ESP32_Radar_Gerbers.zip", size: "1.2MB", fmt: "ZIP", url: "#" }]
   },
   {
     id: 2,
@@ -184,6 +241,41 @@ export const projects: Project[] = [
     forks: 78,
     createdAt: "2026-02-10T09:00:00Z",
     status: "published",
+    prerequisites: ["Strong understanding of C/Assembly", "Operating Systems concepts", "ARM Cortex-M Architecture"],
+    tools: ["J-Link Debugger", "Logic Analyzer", "Oscilloscope"],
+    objectives: ["Achieve deterministic context switching < 2μs", "Implement priority inheritance mutexes", "Create an O(1) memory allocator"],
+    designDecisions: [{ q: "Why cooperative round-robin?", a: "To allow equal priority tasks to share CPU time fairly without starving, while strictly preempting for higher priority tasks." }],
+    githubUrl: "https://github.com/bhavya_dev/rtos-arm-kernel",
+    version: "v0.8.0-beta",
+    license: "Apache-2.0",
+    bom: [
+      { name: "STM32F429I-DISC1", category: "Development Board", qty: 1, price: "2400", supplier: "STMicroelectronics", link: "#" },
+      { name: "Saleae Logic Pro 8", category: "Measurement", qty: 1, price: "40000", supplier: "Saleae", link: "#" }
+    ],
+    codeFiles: [
+      { id: "1", name: "kernel.c", language: "c", content: "#include \"kernel.h\"\n\nvoid os_kernel_start() {\n    // Setup SysTick for 1ms tick\n    SysTick_Config(SystemCoreClock / 1000);\n    os_start_first_task();\n}\n\nvoid os_yield() {\n    // Trigger PendSV for context switch\n    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;\n}" },
+      { id: "2", name: "context.s", language: "c", content: "PendSV_Handler:\n    /* Save current context */\n    MRS R0, PSP\n    STMDB R0!, {R4-R11}\n    /* Load new context */\n    ... " }
+    ],
+    buildSteps: [
+      { title: "Environment Validation", time: "5m", imageUrl: "", body: "Ensure GCC ARM Toolchain is in your PATH. Verify Make is installed." },
+      { title: "Compilation", time: "1m", imageUrl: "", body: "Run `make -j8` in the root directory. This will generate the kernel.elf and kernel.bin files." },
+      { title: "Flashing", time: "2m", imageUrl: "", body: "Connect J-Link and run `make flash`." }
+    ],
+    buildInstructions: [
+      { step: "Clean", cmd: "make clean", note: "Removes all object fields" },
+      { step: "Build", cmd: "make all", note: "Builds ELF, BIN, and HEX" }
+    ],
+    envSetup: [
+      { title: "Compiler", items: ["arm-none-eabi-gcc v10.3.1"] },
+      { title: "Debugger", items: ["OpenOCD v0.11", "GDB-Multiarch"] }
+    ],
+    testSuite: [
+      { name: "Context Switch Latency", file: "test_latency.c", status: "pass", ms: "12", desc: "Measured max 1.8μs across 10,000 switches" },
+      { name: "Mutex Priority Inheritance", file: "test_mutex.c", status: "pass", ms: "45", desc: "Verifies high priority task unblocks quickly" }
+    ],
+    galleryImages: [
+      { url: "https://images.unsplash.com/photo-1501250987900-211872d97eaa?auto=format&fit=crop&w=600&q=80", caption: "Dev board running 15 concurrent tasks", label: "Runtime" }
+    ]
   },
   {
     id: 8,

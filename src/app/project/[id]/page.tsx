@@ -8,13 +8,14 @@ import {
   ThumbsUp, Send, ChevronDown, Clock, Eye, Wrench, BookOpen,
   GitBranch, Award, Link2, Users, FlaskConical, CheckCircle2, Info,
   Search, Copy, Film, Youtube, Image as ImageIcon, X, Play,
-  FileText, Package, Maximize2, Tv2, Cpu as ChipIcon, Globe
+  FileText, Package, Maximize2, Tv2, Cpu as ChipIcon, Globe, GitPullRequest, FileDiff
 } from "lucide-react";
 import { getCommentsByProjectId, Comment } from "@/mockData/comments";
 import { getBOMByProjectId } from "@/mockData/bom";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useProjectsStore } from "@/stores/projectsStore";
+import { useContributionStore } from "@/stores/contributionStore";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -835,7 +836,8 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, user: authUser } = useAuthStore();
-  const { forkProject, projects } = useProjectsStore();
+  const { forkProject, projects, getUpstreamChanges, syncWithUpstream, getForkNetwork } = useProjectsStore();
+  const { getProposalsForProject, createProposal } = useContributionStore();
   const project = projects.find(p => p.id === parseInt(id));
   const [activeTab, setActiveTab] = useState("overview");
   const [isStarred, setIsStarred] = useState(false);
@@ -854,6 +856,35 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const [mediaSection, setMediaSection] = useState<"gallery" | "videos" | "simulation" | "buildlog" | "community" | "files">("gallery");
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
+
+  // Contributions state
+  const projectProposals = project ? getProposalsForProject(project.id) : [];
+  const { mergeProposal, closeProposal } = useContributionStore();
+  const [showProposeModal, setShowProposeModal] = useState(false);
+  const [proposalTitle, setProposalTitle] = useState("");
+  const [proposalDesc, setProposalDesc] = useState("");
+  const [showCompareModal, setShowCompareModal] = useState(false);
+
+  const handlePropose = () => {
+    if (!project?.forkedFrom) return;
+    if (!proposalTitle.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+    createProposal({
+      forkProjectId: project.id,
+      upstreamProjectId: project.forkedFrom.projectId,
+      authorId: authUser?.id ?? "unknown",
+      author: authUser?.username ?? "Anonymous",
+      title: proposalTitle,
+      description: proposalDesc,
+      changes: ["Proposed changes from fork"]
+    });
+    toast.success("Contribution Proposed", { description: "Your pull request has been submitted to the upstream project." });
+    setShowProposeModal(false);
+    setProposalTitle("");
+    setProposalDesc("");
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -936,6 +967,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     { id: "steps", label: "Build Steps", icon: Zap },
     { id: "code", label: "Code", icon: CodeIcon },
     { id: "media", label: "Media", icon: Film },
+    { id: "contributions", label: "Contributions", icon: GitPullRequest },
   ];
 
   return (
@@ -995,6 +1027,22 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                   </div>
                 </Link>
 
+                {project.forkedFrom && (
+                  <div className="mb-4 inline-flex items-center gap-2 p-2 pr-4 bg-muted/40 border border-border rounded-xl">
+                    <div className="p-1.5 bg-primary/10 text-primary rounded-lg shrink-0">
+                      <GitFork size={14} />
+                    </div>
+                    <span className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/80">
+                      Forked from <Link href={`/project/${project.forkedFrom.projectId}`} className="text-primary hover:underline">{project.forkedFrom.projectTitle}</Link>
+                    </span>
+                    {getUpstreamChanges(project.id) > 0 && (
+                      <span className="ml-2 text-[10px] uppercase font-black tracking-widest text-amber-500">
+                        {getUpstreamChanges(project.id)} updates behind
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <h1 className="text-4xl md:text-6xl font-black font-display text-foreground mb-6 leading-[1.1] tracking-tight">{project.title}</h1>
                 <p className="text-lg text-muted-foreground mb-10 font-medium leading-relaxed">{project.description}</p>
 
@@ -1019,13 +1067,23 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-5">
+                <div className="flex flex-wrap gap-5 mt-6">
                   <Button variant={isStarred ? "secondary" : "primary"} onClick={handleStar} icon={<Star size={18} className={isStarred ? "fill-amber-500 text-amber-500" : ""} />} className="px-8 h-14 rounded-[20px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/10">
                     {isStarred ? "Starred" : "Star Artifact"}
                   </Button>
                   <Button variant="ghost" icon={<GitFork size={18} />} onClick={handleFork} className="px-8 h-14 rounded-[20px] text-[11px] font-black uppercase tracking-[0.2em] border border-border bg-muted/30 shadow-xl">
                     Fork
                   </Button>
+                  {project.forkedFrom && project.authorId === authUser?.id && getUpstreamChanges(project.id) > 0 && (
+                    <Button variant="secondary" icon={<Zap size={18} />} onClick={() => { syncWithUpstream(project.id); toast.success("Successfully synced with upstream"); }} className="px-8 h-14 rounded-[20px] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl">
+                      Sync Upstream
+                    </Button>
+                  )}
+                  {project.forkedFrom && (
+                    <Button variant="ghost" icon={<FileDiff size={18} />} onClick={() => setShowCompareModal(true)} className="px-8 h-14 rounded-[20px] text-[11px] font-black uppercase tracking-[0.2em] border border-border bg-muted/30 shadow-xl">
+                      Compare
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -1241,6 +1299,27 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             ))}
                           </div>
                         </div>
+
+                        {/* Fork Network */}
+                        {getForkNetwork(project.id).length > 0 && (
+                          <div className="p-7 rounded-3xl bg-card border border-border shadow-md">
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.35em] text-foreground/60 mb-5 flex items-center gap-2">
+                              <div className="w-1.5 h-4 bg-primary rounded-full" /> Fork Network
+                            </h4>
+                            <div className="space-y-4">
+                              {getForkNetwork(project.id).map(fork => (
+                                <Link key={fork.id} href={`/project/${fork.id}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 border border-transparent hover:border-border text-sm font-bold text-muted-foreground hover:text-foreground transition-all group">
+                                  <img src={fork.authorAvatar} alt={fork.author} className="w-8 h-8 rounded-full border border-border" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-black text-xs text-foreground truncate">@{fork.author}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">{fork.title}</p>
+                                  </div>
+                                  <ExternalLink size={12} className="opacity-40" />
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Author Card */}
                         <div className="p-7 rounded-3xl bg-card border border-border shadow-md">
@@ -2497,6 +2576,85 @@ MIT — fork freely, credit appreciated.`,
                   );
                 })()}
 
+                {/* ── Contributions ── */}
+                {activeTab === "contributions" && (
+                  <div className="space-y-8">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h2 className="text-3xl font-black font-display tracking-tight mb-2">Contributions</h2>
+                        <p className="text-sm text-muted-foreground font-medium">Manage pull requests and proposed improvements from the community.</p>
+                      </div>
+                      {project.forkedFrom && project.authorId === authUser?.id && (
+                        <Button variant="primary" onClick={() => setShowProposeModal(true)} icon={<GitPullRequest size={16} />} className="px-6 h-12 text-[11px] uppercase tracking-widest font-black rounded-2xl shadow-xl shadow-primary/20">
+                          Propose Changes
+                        </Button>
+                      )}
+                    </div>
+
+                    {showProposeModal && (
+                      <div className="p-6 bg-card border border-border rounded-3xl mb-8 space-y-4">
+                        <h3 className="text-xl font-black">New Proposal</h3>
+                        <input
+                          value={proposalTitle}
+                          onChange={(e) => setProposalTitle(e.target.value)}
+                          placeholder="Proposal Title (e.g. Switched to USB-C)"
+                          className="w-full bg-muted/30 border border-border p-4 rounded-xl text-sm font-medium focus:outline-primary"
+                        />
+                        <textarea
+                          value={proposalDesc}
+                          onChange={(e) => setProposalDesc(e.target.value)}
+                          placeholder="Describe your changes and why they improve the project..."
+                          className="w-full bg-muted/30 border border-border p-4 rounded-xl min-h-[120px] text-sm font-medium focus:outline-primary"
+                        />
+                        <div className="flex justify-end gap-3">
+                          <Button variant="ghost" onClick={() => setShowProposeModal(false)} className="px-6 rounded-xl border border-border uppercase text-[10px] font-black">Cancel</Button>
+                          <Button variant="primary" onClick={handlePropose} className="px-6 rounded-xl uppercase text-[10px] font-black">Submit Proposal</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      {projectProposals.length === 0 ? (
+                        <div className="py-20 text-center border border-dashed border-border rounded-3xl">
+                          <GitBranch size={40} className="text-muted-foreground/20 mx-auto mb-4" />
+                          <p className="text-muted-foreground font-medium">No contribution proposals yet.</p>
+                        </div>
+                      ) : (
+                        projectProposals.map(prop => (
+                          <div key={prop.id} className="p-6 bg-card border border-border rounded-2xl flex flex-col md:flex-row gap-6 md:items-center justify-between transition-all hover:border-primary/30">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="text-lg font-black">{prop.title}</h4>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${prop.status === 'open' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                  prop.status === 'merged' ? 'bg-primary/10 text-primary border-primary/20' :
+                                    'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                  }`}>
+                                  {prop.status}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground font-medium flex items-center gap-2">
+                                <span>#{prop.id.split('-')[1]} opened {new Date(prop.createdAt).toLocaleDateString()} by <span className="text-foreground">@{prop.author}</span></span>
+                              </div>
+                              <p className="mt-3 text-sm">{prop.description}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {prop.status === 'open' && project.authorId === authUser?.id && (
+                                <>
+                                  <Button variant="ghost" onClick={() => closeProposal(prop.id)} className="h-9 px-4 rounded-lg text-rose-500 border border-rose-500/20 hover:bg-rose-500/10 text-[10px] uppercase font-black tracking-widest">Reject</Button>
+                                  <Button variant="primary" onClick={() => mergeProposal(prop.id)} className="h-9 px-4 rounded-lg text-[10px] uppercase font-black tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white shadow-none">Merge</Button>
+                                </>
+                              )}
+                              {prop.status !== 'open' && (
+                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Resolved</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </motion.div>
             </AnimatePresence>
 
@@ -2563,6 +2721,57 @@ MIT — fork freely, credit appreciated.`,
           </div>
         </footer>
       </div>
+
+      {/* Compare Modal */}
+      <AnimatePresence>
+        {showCompareModal && project.forkedFrom && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-card w-full max-w-2xl border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black font-display">Comparing Changes</h3>
+                  <p className="text-sm font-medium text-muted-foreground mt-1">
+                    <span className="text-accent">@{project.author}:{project.title}</span> vs <span className="text-primary">@{project.forkedFrom.author}:{project.forkedFrom.projectTitle}</span>
+                  </p>
+                </div>
+                <button onClick={() => setShowCompareModal(false)} className="p-2 bg-muted/50 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 bg-muted/10 space-y-4">
+                {/* Mock diffs */}
+                <div className="p-4 rounded-xl border border-border bg-card font-mono text-xs">
+                  <div className="flex items-center gap-2 text-foreground/60 mb-3 border-b border-border/50 pb-2">
+                    <FileText size={14} /> main.cpp
+                  </div>
+                  <div className="text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded mb-1">- #define DEBUG 1</div>
+                  <div className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">+ #define DEBUG 0</div>
+                  <div className="text-muted-foreground px-2 py-0.5">  void setup() {'{'}</div>
+                </div>
+                <div className="p-4 rounded-xl border border-border bg-card font-mono text-xs">
+                  <div className="flex items-center gap-2 text-foreground/60 mb-3 border-b border-border/50 pb-2">
+                    <Package size={14} /> bom.csv
+                  </div>
+                  <div className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">+ Capacitor 10uF,0805,10V</div>
+                  <div className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">+ Resistor 10k,0402,1%</div>
+                </div>
+                <div className="py-4 text-center">
+                  <p className="text-sm font-bold text-muted-foreground">Showing 2 changed files with 4 additions and 1 deletion.</p>
+                </div>
+              </div>
+              <div className="p-6 border-t border-border bg-card flex justify-between items-center bg-muted/20">
+                <Button variant="ghost" onClick={() => setShowCompareModal(false)} className="px-6 rounded-xl border border-border text-[10px] font-black uppercase">Cancel</Button>
+                {project.authorId === authUser?.id && (
+                  <Button variant="primary" onClick={() => { setShowCompareModal(false); setActiveTab("contributions"); setShowProposeModal(true); }} className="px-6 rounded-xl text-[10px] font-black uppercase">
+                    Propose Changes
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

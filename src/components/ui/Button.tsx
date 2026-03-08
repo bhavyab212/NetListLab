@@ -6,11 +6,14 @@ import { Loader2 } from 'lucide-react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends React.ComponentPropsWithoutRef<'button'> {
     variant?: ButtonVariant;
     isLoading?: boolean;
     fullWidth?: boolean;
     icon?: React.ReactNode;
+    children?: React.ReactNode;
+    className?: string;
+    onClick?: React.MouseEventHandler<HTMLButtonElement>;
 }
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {

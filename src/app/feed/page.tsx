@@ -19,9 +19,10 @@ import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useProjectsStore } from "@/stores/projectsStore";
 
 /* ─── Feed Card ─── */
-const FeedCard = ({ project, user }: { project: typeof projects[0]; user: typeof mockUsers[0] }) => {
+const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; user: typeof mockUsers[0]; handleFork: (project: typeof projects[0]) => void }) => {
     const [liked, setLiked] = useState(false);
     const [bookmarked, setBookmarked] = useState(false);
     const [starCount, setStarCount] = useState(project.stars);
@@ -88,7 +89,7 @@ const FeedCard = ({ project, user }: { project: typeof projects[0]; user: typeof
                                 <MessageSquare size={13} /> {project.comments}
                             </button>
                         </Link>
-                        <button onClick={() => toast.success("Forked!", { description: `Forked ${project.title} to your lab.` })}
+                        <button onClick={() => handleFork(project)}
                             className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all">
                             <GitFork size={13} /> {fmt(project.forks)}
                         </button>
@@ -172,6 +173,7 @@ export default function FeedPage() {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated, logout, user: authUser } = useAuthStore();
     const router = useRouter();
+    const { forkProject } = useProjectsStore();
     const [scrolled, setScrolled] = useState(false);
     const [feedFilter, setFeedFilter] = useState("For You");
 
@@ -200,8 +202,8 @@ export default function FeedPage() {
                         <h1 className="text-4xl font-black font-display mt-12 mb-4">Your Engineering Feed</h1>
                         <p className="text-muted-foreground font-medium mb-10">Login to see a personalized feed from builders you follow.</p>
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <Link href="/login" className="flex-1"><Button variant="ghost" fullWidth className="h-14 rounded-2xl font-black uppercase tracking-widest border border-border">Login</Button></Link>
-                            <Link href="/register" className="flex-1"><Button variant="primary" fullWidth className="h-14 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20">Join Lab</Button></Link>
+                            <Link href="/login" className="flex-1"><Button variant="ghost" fullWidth className="h-14 rounded-2xl font-black uppercase tracking-widest border border-border" /></Link>
+                            <Link href="/register" className="flex-1"><Button variant="primary" fullWidth className="h-14 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20" /></Link>
                         </div>
                     </div>
                 </div>
@@ -219,9 +221,12 @@ export default function FeedPage() {
                 {/* Header */}
                 <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
                     <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
-                        <div className="flex items-center gap-8">
+                        <div className="flex items-center gap-5">
+                            <button onClick={() => router.back()} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
+                                <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                            </button>
                             <Logo size="md" />
-                            <nav className="hidden xl:flex items-center gap-8">
+                            <nav className="hidden xl:flex items-center gap-8 pl-3">
                                 {[{ label: "Explore", href: "/explore" }, { label: "Feed", href: "/feed" }, { label: "Dashboard", href: "/dashboard" }].map(item => (
                                     <Link key={item.label} href={item.href} className={`text-[10px] font-black uppercase tracking-[0.25em] transition-all relative group ${item.href === "/feed" ? "text-primary" : "text-muted-foreground hover:text-primary"}`}>
                                         {item.label}
@@ -236,7 +241,7 @@ export default function FeedPage() {
                             </button>
                             <div className="h-5 w-px bg-border/50 mx-1 hidden sm:block" />
                             <Link href="/project/new">
-                                <Button variant="primary" icon={<Plus size={15} />} className="px-6 h-11 rounded-full text-[10px] font-black uppercase tracking-widest hidden sm:flex shadow-lg shadow-primary/20">Create</Button>
+                                <Button variant="primary" icon={<Plus size={15} />} className="px-6 h-11 rounded-full text-[10px] font-black uppercase tracking-widest hidden sm:flex shadow-lg shadow-primary/20" />
                             </Link>
                             <Link href="/dashboard">
                                 <div className="relative">
@@ -266,7 +271,11 @@ export default function FeedPage() {
 
                                 <div className="flex flex-col gap-10">
                                     {filteredFeed.map(({ project, user }) => (
-                                        <FeedCard key={project.id} project={project} user={user} />
+                                        <FeedCard key={project.id} project={project} user={user} handleFork={(p) => {
+                                            if (!authUser) { toast.error("Sign in to fork"); return; };
+                                            forkProject(p.id, authUser.id, `@${authUser.username}`, authUser.avatar);
+                                            toast.success("Workspace Created", { description: `Forked ${p.title} to your lab.` });
+                                        }} />
                                     ))}
                                 </div>
                             </div>
@@ -278,7 +287,7 @@ export default function FeedPage() {
                                 <div className="bg-card/60 border border-border rounded-[24px] p-7 text-center">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mb-5">Start building</p>
                                     <Link href="/project/new">
-                                        <Button variant="primary" fullWidth className="h-12 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20" icon={<Plus size={15} />}>New Project</Button>
+                                        <Button variant="primary" fullWidth className="h-12 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20" icon={<Plus size={15} />} />
                                     </Link>
                                 </div>
                             </div>

@@ -1,9 +1,10 @@
-"use client" ; 
+"use client";
 
 import Link from 'next/link';
 
 interface LogoProps {
     size?: 'sm' | 'md' | 'lg';
+    href?: string;
 }
 
 const sizes = {
@@ -12,11 +13,11 @@ const sizes = {
     lg: { fontSize: '2rem', padding: '12px 0' },
 };
 
-export default function Logo({ size = 'md' }: LogoProps) {
+export default function Logo({ size = 'md', href = '/explore' }: LogoProps) {
     const s = sizes[size];
 
     return (
-        <Link href="/" style={{ textDecoration: 'none' }}>
+        <Link href={href} style={{ textDecoration: 'none' }}>
             <div
                 style={{
                     fontFamily: "'Space Grotesk', sans-serif",

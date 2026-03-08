@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
-    Star, GitFork, Eye, TrendingUp, Plus, Settings, Bell, Sun, Moon,
-    Cpu, ArrowRight, Edit2, Archive, ExternalLink, BarChart2,
-    Bookmark, Clock, Zap, LogOut, User
+    Star, GitFork, Eye, TrendingUp, ShieldCheck, AlertTriangle, LinkIcon, Zap, Monitor, Activity, Settings, User, Box, ArrowRight, BookOpen, AlertCircle, Bookmark, ExternalLink, MessageSquare, Plus, Edit2, Play, LayoutDashboard, ChevronRight, ZapOff, Fingerprint, Github, Twitter, Linkedin, CheckCircle2, Bell, Sun, Moon, Cpu, Archive, BarChart2, Clock, LogOut, ArrowLeft
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -27,7 +25,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const [activeNav, setActiveNav] = useState<NavItem>("overview");
 
-    const { getMyProjects, projects, starredIds, toggleBookmark, getForkedProjects, forkProject, bookmarkedIds } = useProjectsStore();
+    const { getMyProjects, projects, starredIds, toggleBookmark, getForkedProjects, forkProject, bookmarkedIds, getUpstreamChanges, syncWithUpstream } = useProjectsStore();
     const { notifications, unreadCount: unreadNotifs } = useNotificationStore();
 
     const [isMounted, setIsMounted] = useState(false);
@@ -139,8 +137,18 @@ export default function DashboardPage() {
                     <div className="flex-1 lg:ml-72 overflow-y-auto h-screen">
                         {/* Top bar (mobile + desktop) */}
                         <div className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-5 bg-background/80 backdrop-blur-xl border-b border-border">
-                            <div className="lg:hidden"><Logo size="sm" /></div>
-                            <h2 className="hidden lg:block text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground/50 capitalize">{activeNav}</h2>
+                            <div className="lg:hidden flex items-center gap-3">
+                                <button onClick={() => router.back()} className="p-2 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
+                                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                                </button>
+                                <Logo size="sm" />
+                            </div>
+                            <div className="hidden lg:flex items-center gap-4">
+                                <button onClick={() => router.back()} className="p-2.5 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
+                                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                                </button>
+                                <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground/50 capitalize">{activeNav}</h2>
+                            </div>
                             <div className="flex items-center gap-3">
                                 <Link href="/project/new">
                                     <Button variant="primary" icon={<Plus size={15} />} className="h-10 px-5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">New Project</Button>
@@ -324,12 +332,36 @@ export default function DashboardPage() {
                                                 <div className="p-6 flex-1 flex flex-col justify-between">
                                                     <div>
                                                         <h4 className="text-lg font-black font-display text-foreground group-hover:text-primary transition-colors mb-2 line-clamp-1">{p.title}</h4>
-                                                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-4">Original by @{p.author}</p>
+                                                        {p.forkedFrom ? (
+                                                            <div className="flex flex-col gap-1 mb-4">
+                                                                <Link href={`/project/${p.forkedFrom.projectId}`} className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest hover:text-primary transition-colors">
+                                                                    Forked from {p.forkedFrom.projectTitle}
+                                                                </Link>
+                                                                {getUpstreamChanges(p.id) > 0 ? (
+                                                                    <span className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1">
+                                                                        <AlertTriangle size={12} /> {getUpstreamChanges(p.id)} updates behind upstream
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                                                                        <CheckCircle2 size={12} /> Up to date with upstream
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-4">Original by @{p.author}</p>
+                                                        )}
                                                     </div>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-2 mt-4 mt-auto">
                                                         <Link className="flex-1" href={`/project/${p.id}/edit`}>
                                                             <button className="w-full h-10 rounded-xl bg-primary/10 border border-primary/20 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all">Continue Building</button>
                                                         </Link>
+                                                        {p.forkedFrom && getUpstreamChanges(p.id) > 0 && (
+                                                            <button
+                                                                onClick={(e) => { e.preventDefault(); syncWithUpstream(p.id); toast.success("Synced with upstream"); }}
+                                                                className="h-10 px-4 rounded-xl border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-border/50 transition-all flex items-center gap-2">
+                                                                Sync
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
