@@ -45,5 +45,4 @@ prisma/.env
 
 # server directories
 server/node_modules
-server/dist
 prisma/migrations
