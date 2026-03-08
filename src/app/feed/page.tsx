@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from "react";
 import {
-    Star, GitFork, MessageSquare, Heart, Bookmark, ArrowLeft,
-    Sun, Moon, Plus, Bell, Menu, X, TrendingUp, Users, Flame,
-    ExternalLink, Download, Filter, ChevronDown
+    Star, GitFork, MessageSquare, Bookmark, ArrowLeft,
+    Sun, Moon, Plus, Flame, Users,
+    ExternalLink, Loader2
 } from "lucide-react";
-import { projects } from "@/mockData/projects";
-import { mockUsers } from "@/mockData/users";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,18 +17,55 @@ import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useProjectsStore } from "@/stores/projectsStore";
+import { api, buildQueryString } from "@/lib/api";
+import { ApiProject, ApiUser } from "@/lib/api-types";
 
-/* ─── Feed Card ─── */
-const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; user: typeof mockUsers[0]; handleFork: (project: typeof projects[0]) => void }) => {
-    const [liked, setLiked] = useState(false);
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+const timeAgo = (iso: string) => {
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    return d === 0 ? "Today" : d === 1 ? "Yesterday" : `${d}d ago`;
+};
+
+const getCategoryStyles = (type: string) => {
+    const map: Record<string, string> = {
+        Analog: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+        Digital: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+        "Mixed-Signal": "text-violet-500 bg-violet-500/10 border-violet-500/20",
+        "RF/Microwave": "text-amber-500 bg-amber-500/10 border-amber-500/20",
+        Power: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    };
+    return map[type] ?? "text-primary bg-primary/10 border-primary/20";
+};
+
+// ─── Feed Card ────────────────────────────────────────────────────────────────
+const FeedCard = ({
+    project,
+    onFork,
+}: {
+    project: ApiProject;
+    onFork: (project: ApiProject) => void;
+}) => {
+    const [starred, setStarred] = useState(false);
+    const [starCount, setStarCount] = useState(project.star_count);
     const [bookmarked, setBookmarked] = useState(false);
-    const [starCount, setStarCount] = useState(project.stars);
-    const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
 
-    const timeAgo = (iso: string) => {
-        const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-        return d === 0 ? "Today" : d === 1 ? "Yesterday" : `${d}d ago`;
+    const author = project.author;
+    const authorUsername = author?.username ?? "unknown";
+    const authorAvatar = author?.avatar_url ?? `https://i.pravatar.cc/100?u=${project.author_id}`;
+    const authorName = author?.full_name ?? authorUsername;
+    const categoryStyles = getCategoryStyles(project.project_type);
+
+    const handleStar = async () => {
+        setStarred(s => !s);
+        setStarCount(c => starred ? c - 1 : c + 1);
+        try {
+            await api.toggleStar(project.id);
+        } catch {
+            // revert on error
+            setStarred(s => !s);
+            setStarCount(c => starred ? c + 1 : c - 1);
+        }
     };
 
     return (
@@ -42,24 +77,28 @@ const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; 
         >
             {/* Author row */}
             <div className="flex items-center gap-4 p-6 pb-4">
-                <Link href={`/user/${user.username}`}>
-                    <img src={user.avatar} alt={user.fullName} className="w-12 h-12 rounded-full border-2 border-border hover:border-primary transition-all" />
+                <Link href={`/user/${authorUsername}`}>
+                    <img src={authorAvatar} alt={authorName} className="w-12 h-12 rounded-full border-2 border-border hover:border-primary transition-all" />
                 </Link>
                 <div className="flex-1">
-                    <Link href={`/user/${user.username}`} className="text-sm font-black text-foreground hover:text-primary transition-colors">{user.fullName}</Link>
+                    <Link href={`/user/${authorUsername}`} className="text-sm font-black text-foreground hover:text-primary transition-colors">{authorName}</Link>
                     <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">@{user.username}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">@{authorUsername}</span>
                         <span className="text-muted-foreground/30">·</span>
-                        <span className="text-[10px] font-bold text-muted-foreground/40">{timeAgo(project.createdAt)}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground/40">{timeAgo(project.created_at)}</span>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${project.categoryStyles}`}>{project.category}</span>
+                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${categoryStyles}`}>{project.project_type}</span>
             </div>
 
             {/* Image */}
             <Link href={`/project/${project.id}`}>
                 <div className="mx-5 rounded-[20px] overflow-hidden aspect-[16/9] group cursor-pointer">
-                    <img src={project.image} alt={project.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <img
+                        src={project.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80`}
+                        alt={project.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
                 </div>
             </Link>
 
@@ -68,7 +107,7 @@ const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; 
                 <Link href={`/project/${project.id}`}>
                     <h3 className="text-xl font-black font-display text-foreground hover:text-primary transition-colors mb-2 leading-tight">{project.title}</h3>
                 </Link>
-                <p className="text-sm text-muted-foreground font-medium line-clamp-2 mb-5 leading-relaxed opacity-80">{project.description}</p>
+                <p className="text-sm text-muted-foreground font-medium line-clamp-2 mb-5 leading-relaxed opacity-80">{project.tagline ?? project.description}</p>
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2 mb-5">
@@ -80,23 +119,29 @@ const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; 
                 {/* Actions */}
                 <div className="flex items-center justify-between border-t border-border/50 pt-5">
                     <div className="flex items-center gap-2">
-                        <button onClick={() => { setLiked(!liked); setStarCount(p => liked ? p - 1 : p + 1); }}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${liked ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted/40 text-muted-foreground border border-border hover:text-amber-500"}`}>
-                            <Star size={13} className={liked ? "fill-amber-500" : ""} /> {fmt(starCount)}
+                        <button
+                            onClick={handleStar}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${starred ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted/40 text-muted-foreground border border-border hover:text-amber-500"}`}
+                        >
+                            <Star size={13} className={starred ? "fill-amber-500" : ""} /> {fmt(starCount)}
                         </button>
                         <Link href={`/project/${project.id}#comments`}>
                             <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all">
-                                <MessageSquare size={13} /> {project.comments}
+                                <MessageSquare size={13} /> {project.comment_count}
                             </button>
                         </Link>
-                        <button onClick={() => handleFork(project)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all">
-                            <GitFork size={13} /> {fmt(project.forks)}
+                        <button
+                            onClick={() => onFork(project)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all"
+                        >
+                            <GitFork size={13} /> {fmt(project.fork_count)}
                         </button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => { setBookmarked(!bookmarked); toast.success(bookmarked ? "Removed" : "Saved to library"); }}
-                            className={`p-2.5 rounded-full border ${bookmarked ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-primary"} transition-all`}>
+                        <button
+                            onClick={() => { setBookmarked(b => !b); toast.success(bookmarked ? "Removed" : "Saved to library"); }}
+                            className={`p-2.5 rounded-full border ${bookmarked ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-primary"} transition-all`}
+                        >
                             <Bookmark size={14} className={bookmarked ? "fill-primary" : ""} />
                         </button>
                         <Link href={`/project/${project.id}`}>
@@ -111,43 +156,9 @@ const FeedCard = ({ project, user, handleFork }: { project: typeof projects[0]; 
     );
 };
 
-/* ─── Who to Follow ─── */
-const WhoToFollow = () => {
-    const [followed, setFollowed] = useState<string[]>([]);
-    const suggestions = mockUsers.slice(1, 4);
-
-    return (
-        <div className="bg-card/60 border border-border rounded-[24px] p-7">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-6 flex items-center gap-2"><Users size={14} /> Suggested Builders</h3>
-            <div className="space-y-5">
-                {suggestions.map(u => (
-                    <div key={u.id} className="flex items-center gap-4">
-                        <Link href={`/user/${u.username}`}>
-                            <img src={u.avatar} alt={u.fullName} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                            <Link href={`/user/${u.username}`} className="text-sm font-black text-foreground hover:text-primary transition-colors truncate block">{u.fullName}</Link>
-                            <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{u.role}</p>
-                        </div>
-                        <button onClick={() => {
-                            const isF = followed.includes(u.id);
-                            setFollowed(p => isF ? p.filter(x => x !== u.id) : [...p, u.id]);
-                            toast.success(isF ? `Unfollowed @${u.username}` : `Following @${u.username}!`);
-                        }}
-                            className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${followed.includes(u.id) ? "bg-muted/40 border-border text-muted-foreground" : "bg-primary/10 border-primary/20 text-primary hover:bg-primary hover:text-white"}`}>
-                            {followed.includes(u.id) ? "Following" : "Follow"}
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-/* ─── Trending Sidebar ─── */
-const TrendingSidebar = () => {
-    const top = [...projects].sort((a, b) => b.stars - a.stars).slice(0, 5);
-    const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+// ─── Trending Sidebar ─────────────────────────────────────────────────────────
+const TrendingSidebar = ({ projects }: { projects: ApiProject[] }) => {
+    const top = [...projects].sort((a, b) => b.star_count - a.star_count).slice(0, 5);
     return (
         <div className="bg-card/60 border border-border rounded-[24px] p-7">
             <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-6 flex items-center gap-2"><Flame size={14} className="text-amber-500" /> Trending Artifacts</h3>
@@ -158,7 +169,7 @@ const TrendingSidebar = () => {
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-black text-foreground group-hover:text-primary transition-colors truncate">{p.title}</p>
                             <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-                                <Star size={10} className="text-amber-400" /> {fmt(p.stars)} · {p.category}
+                                <Star size={10} className="text-amber-400" /> {fmt(p.star_count)} · {p.project_type}
                             </p>
                         </div>
                     </Link>
@@ -168,14 +179,51 @@ const TrendingSidebar = () => {
     );
 };
 
-/* ─── Main Page ─── */
+// ─── Who to Follow ────────────────────────────────────────────────────────────
+const WhoToFollow = ({ suggestions }: { suggestions: ApiUser[] }) => {
+    const [followed, setFollowed] = useState<string[]>([]);
+    return (
+        <div className="bg-card/60 border border-border rounded-[24px] p-7">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-6 flex items-center gap-2"><Users size={14} /> Suggested Builders</h3>
+            <div className="space-y-5">
+                {suggestions.map(u => (
+                    <div key={u.id} className="flex items-center gap-4">
+                        <Link href={`/user/${u.username}`}>
+                            <img src={u.avatar_url ?? `https://i.pravatar.cc/100?u=${u.id}`} alt={u.full_name} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
+                        </Link>
+                        <div className="flex-1 min-w-0">
+                            <Link href={`/user/${u.username}`} className="text-sm font-black text-foreground hover:text-primary transition-colors truncate block">{u.full_name}</Link>
+                            <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{u.current_role ?? "Builder"}</p>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                const isF = followed.includes(u.id);
+                                setFollowed(p => isF ? p.filter(x => x !== u.id) : [...p, u.id]);
+                                toast.success(isF ? `Unfollowed @${u.username}` : `Following @${u.username}!`);
+                                await api.toggleFollow(u.username).catch(() => { });
+                            }}
+                            className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${followed.includes(u.id) ? "bg-muted/40 border-border text-muted-foreground" : "bg-primary/10 border-primary/20 text-primary hover:bg-primary hover:text-white"}`}
+                        >
+                            {followed.includes(u.id) ? "Following" : "Follow"}
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function FeedPage() {
     const { isDark, toggle } = useThemeStore();
-    const { isAuthenticated, logout, user: authUser } = useAuthStore();
+    const { isAuthenticated, user: authUser } = useAuthStore();
     const router = useRouter();
-    const { forkProject } = useProjectsStore();
     const [scrolled, setScrolled] = useState(false);
     const [feedFilter, setFeedFilter] = useState("For You");
+
+    const [projects, setProjects] = useState<ApiProject[]>([]);
+    const [suggestions, setSuggestions] = useState<ApiUser[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -183,15 +231,55 @@ export default function FeedPage() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // Build feed: pair each project with its mock author
-    const feedItems = projects.map(p => ({
-        project: p,
-        user: mockUsers.find(u => u.id === p.authorId) ?? mockUsers[0],
-    }));
+    useEffect(() => {
+        let mounted = true;
+        const fetchFeed = async () => {
+            try {
+                setIsLoading(true);
+                const qs = buildQueryString({ sort: "newest", limit: 20 });
+                const result = await api.getProjects(qs);
+                if (mounted) {
+                    setProjects(result.projects);
+                    // Extract unique authors as "suggested builders"
+                    const seen = new Set<string>();
+                    const authors: ApiUser[] = [];
+                    for (const p of result.projects) {
+                        if (p.author && !seen.has(p.author.id) && p.author.id !== authUser?.id) {
+                            seen.add(p.author.id);
+                            authors.push(p.author);
+                            if (authors.length >= 3) break;
+                        }
+                    }
+                    setSuggestions(authors);
+                }
+            } catch {
+                // silently use empty state
+            } finally {
+                if (mounted) setIsLoading(false);
+            }
+        };
+        fetchFeed();
+        return () => { mounted = false; };
+    }, [authUser?.id]);
 
-    const filteredFeed = feedFilter === "Following"
-        ? feedItems.slice(0, 4) // mock: show subset for following
-        : feedItems;
+    const filteredProjects = feedFilter === "Following"
+        ? projects.slice(0, Math.ceil(projects.length / 2))
+        : feedFilter === "Trending"
+            ? [...projects].sort((a, b) => b.star_count - a.star_count)
+            : projects;
+
+    const handleFork = async (project: ApiProject) => {
+        if (!authUser) { toast.error("Sign in to fork"); return; }
+        try {
+            const forked = await api.forkProject(project.id);
+            toast.success("Workspace Created", {
+                description: `Forked ${project.title} to your lab.`,
+                action: { label: "View", onClick: () => router.push(`/project/${forked.id}`) }
+            });
+        } catch (e: unknown) {
+            toast.error("Fork failed", { description: e instanceof Error ? e.message : "Try again." });
+        }
+    };
 
     if (!isAuthenticated) {
         return (
@@ -245,7 +333,7 @@ export default function FeedPage() {
                             </Link>
                             <Link href="/dashboard">
                                 <div className="relative">
-                                    <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all cursor-pointer" src={authUser?.avatar} />
+                                    <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all cursor-pointer" src={authUser?.avatar_url ?? authUser?.avatar ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                                 </div>
                             </Link>
@@ -269,21 +357,29 @@ export default function FeedPage() {
                                     ))}
                                 </div>
 
-                                <div className="flex flex-col gap-10">
-                                    {filteredFeed.map(({ project, user }) => (
-                                        <FeedCard key={project.id} project={project} user={user} handleFork={(p) => {
-                                            if (!authUser) { toast.error("Sign in to fork"); return; };
-                                            forkProject(p.id, authUser.id, `@${authUser.username}`, authUser.avatar);
-                                            toast.success("Workspace Created", { description: `Forked ${p.title} to your lab.` });
-                                        }} />
-                                    ))}
-                                </div>
+                                {isLoading ? (
+                                    <div className="py-32 flex flex-col items-center gap-4">
+                                        <Loader2 size={36} className="animate-spin text-primary" />
+                                        <p className="text-muted-foreground font-medium text-sm">Loading your feed…</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-10">
+                                        {filteredProjects.map(project => (
+                                            <FeedCard key={project.id} project={project} onFork={handleFork} />
+                                        ))}
+                                        {filteredProjects.length === 0 && (
+                                            <div className="py-32 text-center border-2 border-dashed border-muted rounded-[40px]">
+                                                <p className="text-muted-foreground font-medium">No projects in this feed yet.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Sidebar */}
                             <div className="hidden lg:flex flex-col gap-6 lg:sticky lg:top-32 h-fit">
-                                <WhoToFollow />
-                                <TrendingSidebar />
+                                {suggestions.length > 0 && <WhoToFollow suggestions={suggestions} />}
+                                <TrendingSidebar projects={projects} />
                                 <div className="bg-card/60 border border-border rounded-[24px] p-7 text-center">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mb-5">Start building</p>
                                     <Link href="/project/new">

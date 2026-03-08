@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useState, useEffect } from "react";
+import React, { use, useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft, Download, GitFork, Star, Share2, ExternalLink,
   Cpu, Layers, Terminal as CodeIcon, MessageSquare, ChevronRight,
@@ -8,13 +8,10 @@ import {
   ThumbsUp, Send, ChevronDown, Clock, Eye, Wrench, BookOpen,
   GitBranch, Award, Link2, Users, FlaskConical, CheckCircle2, Info,
   Search, Copy, Film, Youtube, Image as ImageIcon, X, Play,
-  FileText, Package, Maximize2, Tv2, Cpu as ChipIcon, Globe, GitPullRequest, FileDiff
+  FileText, Package, Maximize2, Tv2, Cpu as ChipIcon, Globe, GitPullRequest, FileDiff, Loader2
 } from "lucide-react";
-import { getCommentsByProjectId, Comment } from "@/mockData/comments";
-import { getBOMByProjectId } from "@/mockData/bom";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
-import { useProjectsStore } from "@/stores/projectsStore";
 import { useContributionStore } from "@/stores/contributionStore";
 import { useSocialStore } from "@/stores/socialStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +23,77 @@ import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { ApiProject, ApiComment, ApiBOMItem } from "@/lib/api-types";
+
+// ─── Legacy Comment type for CommentItem component ─────────────────────────
+type Comment = {
+  id: string;
+  author: string;
+  avatar: string;
+  body: string;
+  upvotes: number;
+  createdAt: string;
+  replies: { id: string; author: string; avatar: string; body: string; createdAt: string }[];
+};
+
+// ─── Legacy BOM type for BOM tab ───────────────────────────────────────────
+type BOMItem = {
+  id: string;
+  name: string;
+  qty: number;
+  price: number;
+  desc: string;
+  link?: string;
+  partNumber?: string;
+  category?: string;
+  stock?: string;
+  notes?: string;
+  value?: string;
+  mounting?: string;
+  altPart?: string;
+  datasheet?: string;
+};
+
+// ─── Category styles helper ────────────────────────────────────────────────
+const getCategoryStyles = (type: string) => {
+  const m: Record<string, string> = {
+    Analog: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+    Digital: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    "Mixed-Signal": "text-violet-500 bg-violet-500/10 border-violet-500/20",
+    "RF/Microwave": "text-amber-500 bg-amber-500/10 border-amber-500/20",
+    Power: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+  };
+  return m[type] ?? "text-primary bg-primary/10 border-primary/20";
+};
+
+// ─── Convert API comment → legacy Comment ─────────────────────────────────
+const toComment = (c: ApiComment): Comment => ({
+  id: c.id,
+  author: c.author?.username ?? "unknown",
+  avatar: c.author?.avatar_url ?? `https://i.pravatar.cc/100?u=${c.user_id}`,
+  body: c.content,
+  upvotes: c.upvote_count,
+  createdAt: c.created_at,
+  replies: (c.replies ?? []).map(r => ({
+    id: r.id,
+    author: r.author?.username ?? "unknown",
+    avatar: r.author?.avatar_url ?? `https://i.pravatar.cc/100?u=${r.user_id}`,
+    body: r.content,
+    createdAt: r.created_at,
+  })),
+});
+
+// ─── Convert API BOM item → legacy BOMItem ────────────────────────────────
+const toBOMItem = (b: ApiBOMItem): BOMItem => ({
+  id: b.id,
+  name: b.component_name,
+  qty: b.quantity,
+  price: b.estimated_price ?? 0,
+  desc: b.description ?? "",
+  link: b.buy_link ?? undefined,
+  partNumber: b.part_number ?? undefined,
+});
 
 /* ─── Comment Item ─── */
 const CommentItem = ({ comment }: { comment: Comment }) => {
@@ -829,21 +897,22 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, user: authUser } = useAuthStore();
-  const { forkProject, projects, getUpstreamChanges, syncWithUpstream, getForkNetwork } = useProjectsStore();
   const { getProposalsForProject, createProposal } = useContributionStore();
-  const { getProjectComments, addComment, isFollowing, toggleFollow } = useSocialStore();
+  const { isFollowing, toggleFollow } = useSocialStore();
 
-  const project = projects.find(p => p.id === parseInt(id));
+  // ── Real API state ──────────────────────────────────────────────────────
+  const [apiProject, setApiProject] = useState<ApiProject | null>(null);
+  const [apiComments, setApiComments] = useState<ApiComment[]>([]);
+  const [apiBOM, setApiBOM] = useState<ApiBOMItem[]>([]);
+  const [isPageLoading, setIsPageLoading] = useState(true);
+
+  // ── UI State ────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("overview");
   const [isStarred, setIsStarred] = useState(false);
-  const [starCount, setStarCount] = useState(project?.stars ?? 0);
+  const [starCount, setStarCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [commentBody, setCommentBody] = useState("");
 
-  const comments = project ? getProjectComments(project.id) : [];
-  const bom = project ? getBOMByProjectId(project.id) : [];
-
-  // Tab-specific state variables moved to top level to comply with React Rules of Hooks
   const [bomFilter, setBomFilter] = useState("All");
   const [bomSearch, setBomSearch] = useState("");
   const [schTab, setSchTab] = useState<"diagrams" | "stackup" | "rules" | "downloads">("diagrams");
@@ -852,41 +921,82 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const [mediaSection, setMediaSection] = useState<"gallery" | "videos" | "simulation" | "buildlog" | "community" | "files">("gallery");
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
-
-  // Contributions state
-  const projectProposals = project ? getProposalsForProject(project.id) : [];
-  const { mergeProposal, closeProposal } = useContributionStore();
   const [showProposeModal, setShowProposeModal] = useState(false);
   const [proposalTitle, setProposalTitle] = useState("");
   const [proposalDesc, setProposalDesc] = useState("");
   const [showCompareModal, setShowCompareModal] = useState(false);
 
-  const handlePropose = () => {
-    if (!project?.forkedFrom) return;
-    if (!proposalTitle.trim()) {
-      toast.error("Please provide a title");
-      return;
+  // ── Fetch project data ─────────────────────────────────────────────────
+  const fetchProject = useCallback(async () => {
+    try {
+      setIsPageLoading(true);
+      const [proj, comms, bomData] = await Promise.all([
+        api.getProject(id),
+        api.getComments(id).catch(() => [] as ApiComment[]),
+        api.getBOM(id).catch(() => [] as ApiBOMItem[]),
+      ]);
+      setApiProject(proj);
+      setStarCount(proj.star_count);
+      setApiComments(comms);
+      setApiBOM(bomData);
+    } catch {
+      setApiProject(null);
+    } finally {
+      setIsPageLoading(false);
     }
-    createProposal({
-      forkProjectId: project.id,
-      upstreamProjectId: project.forkedFrom.projectId,
-      authorId: authUser?.id ?? "unknown",
-      author: authUser?.username ?? "Anonymous",
-      title: proposalTitle,
-      description: proposalDesc,
-      changes: ["Proposed changes from fork"]
-    });
-    toast.success("Contribution Proposed", { description: "Your pull request has been submitted to the upstream project." });
-    setShowProposeModal(false);
-    setProposalTitle("");
-    setProposalDesc("");
-  };
+  }, [id]);
+
+  useEffect(() => { fetchProject(); }, [fetchProject]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // ── Build legacy bridge object from API project ────────────────────────
+  const project = apiProject ? {
+    ...apiProject,
+    // Legacy field aliases
+    image: apiProject.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80`,
+    stars: starCount,
+    forks: apiProject.fork_count,
+    views: apiProject.view_count,
+    comments: apiProject.comment_count,
+    category: apiProject.project_type,
+    categoryStyles: getCategoryStyles(apiProject.project_type),
+    level: apiProject.difficulty,
+    author: apiProject.author?.username ?? "unknown",
+    authorAvatar: apiProject.author?.avatar_url ?? `https://i.pravatar.cc/100?u=${apiProject.author_id}`,
+    authorId: apiProject.author_id,
+    tags: apiProject.tags,
+    forkedFrom: null as { projectId: number | string; projectTitle: string; author: string } | null,
+    githubUrl: apiProject.github_url,
+    demoUrl: apiProject.demo_video_url,
+    createdAt: apiProject.created_at,
+  } : null;
+
+  // ── Bridge: comments and BOM in legacy format ──────────────────────────
+  const comments: Comment[] = apiComments.map(toComment);
+  const bom: BOMItem[] = apiBOM.map(toBOMItem);
+
+  // ── Contribution store stubs (for local proposals UI) ─────────────────
+  const projectProposals = project ? getProposalsForProject(Number(project.id)) : [];
+  const { mergeProposal, closeProposal } = useContributionStore();
+
+  // ── Fork network stub (local only until API supports it) ──────────────
+  const getUpstreamChanges = (_id: number | string) => 0;
+  const syncWithUpstream = (_id: number | string) => { };
+  const getForkNetwork = (_id: number | string): { id: string; author: string; authorAvatar: string; title: string }[] => [];
+
+  // ── Loading & not-found states ─────────────────────────────────────────
+  if (isPageLoading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? "dark bg-background" : "bg-background"}`}>
+        <Loader2 size={40} className="animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -903,6 +1013,21 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     );
   }
 
+  const handlePropose = () => {
+    if (!proposalTitle.trim()) { toast.error("Please provide a title"); return; }
+    createProposal({
+      forkProjectId: Number(project.id),
+      upstreamProjectId: 0,
+      authorId: authUser?.id ?? "unknown",
+      author: authUser?.username ?? "Anonymous",
+      title: proposalTitle,
+      description: proposalDesc,
+      changes: ["Proposed changes from fork"]
+    });
+    toast.success("Contribution Proposed", { description: "Your pull request has been submitted." });
+    setShowProposeModal(false); setProposalTitle(""); setProposalDesc("");
+  };
+
   const handleReplicate = () => {
     const tid = toast.loading("Connecting to Lab Node…");
     setTimeout(() => {
@@ -910,36 +1035,51 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     }, 2000);
   };
 
-  const handleStar = () => {
-    setIsStarred(!isStarred);
-    setStarCount(p => isStarred ? p - 1 : p + 1);
-    toast.success(isStarred ? "Removed from Library" : "Project Starred!", {
-      description: isStarred ? `Removed ${project.title}` : `Added to your library.`,
-    });
-  };
-
-  const handleFork = () => {
-    if (!authUser) {
-      toast.error("Sign in to fork projects");
-      return;
-    }
-    const newId = forkProject(project!.id, authUser.id, `@${authUser.username}`, authUser.avatar);
-    toast.success("Workspace Created", { description: `Forked ${project?.title} to your lab.` });
-    if (newId) {
-      router.push(`/project/${newId}`);
+  const handleStar = async () => {
+    setIsStarred(s => !s);
+    setStarCount(c => isStarred ? c - 1 : c + 1);
+    try {
+      const res = await api.toggleStar(project.id);
+      setStarCount(res.star_count);
+      setIsStarred(res.starred);
+      toast.success(res.starred ? "Project Starred!" : "Removed from Library");
+    } catch {
+      // revert on error
+      setIsStarred(s => !s);
+      setStarCount(c => isStarred ? c + 1 : c - 1);
     }
   };
-  const handleShare = () => toast.info("Link Copied", { description: "Sharing link copied to clipboard." });
 
-  const handlePostComment = () => {
+  const handleFork = async () => {
+    if (!authUser) { toast.error("Sign in to fork projects"); return; }
+    try {
+      const forked = await api.forkProject(project.id);
+      toast.success("Workspace Created", { description: `Forked ${project.title} to your lab.` });
+      router.push(`/project/${forked.id}`);
+    } catch (e: unknown) {
+      toast.error("Fork failed", { description: e instanceof Error ? e.message : "Try again later." });
+    }
+  };
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href).catch(() => { });
+    toast.info("Link Copied", { description: "Sharing link copied to clipboard." });
+  };
+
+  const handlePostComment = async () => {
     if (!isAuthenticated) {
       toast.error("Login Required", { description: "You need to be logged in to post a comment.", action: { label: "Login", onClick: () => router.push("/login") } });
       return;
     }
     if (!commentBody.trim()) return;
-    addComment(project.id, authUser!.id, authUser!.username, authUser!.avatar, commentBody.trim());
-    setCommentBody("");
-    toast.success("Comment Posted", { description: "Your transmission has been added." });
+    try {
+      const newComment = await api.addComment(project.id, { content: commentBody.trim() });
+      setApiComments(prev => [newComment, ...prev]);
+      setCommentBody("");
+      toast.success("Comment Posted", { description: "Your transmission has been added." });
+    } catch {
+      toast.error("Failed to post comment");
+    }
   };
 
   const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);

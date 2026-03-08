@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
+import { api } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -48,7 +49,6 @@ interface CodeFile { name: string; language: string; content: string; id: string
 export default function NewProjectPage() {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated, user: authUser } = useAuthStore();
-    const { addProject } = useProjectsStore();
     const router = useRouter();
     const [step, setStep] = useState(1);
 
@@ -154,64 +154,65 @@ export default function NewProjectPage() {
         return true;
     };
 
-    const handlePublish = () => {
+    const handlePublish = async () => {
         if (!authUser) return;
-        const newId = Date.now();
-        addProject({
-            id: newId,
+
+        const payload = {
             title,
-            slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            authorId: authUser.id,
-            author: `@${authUser.username}`,
-            authorAvatar: authUser.avatar,
             description,
-            category,
-            level: difficulty,
-            image: coverUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2670&auto=format&fit=crop",
-            stars: 0,
-            views: 0,
-            comments: 0,
-            forks: 0,
+            project_type: category || "Digital",
+            difficulty: difficulty || "Beginner",
+            status: publishStatus === "published" ? "PUBLISHED" : "DRAFT",
             tags,
-            status: publishStatus,
-            bom: bomRows,
-            buildSteps,
-            codeFiles,
-            prerequisites,
-            tools,
-            designDecisions,
-            objectives,
-            githubUrl,
-            docsUrl,
-            version,
-            license,
-            safetyNotice,
-            schematics,
-            pcbLayers,
-            pcbBoardSpecs,
-            designRules,
-            signalNotes,
-            dependencies,
-            buildInstructions,
-            envSetup,
-            testSuite,
-            galleryImages: galleryImages.map(url => ({ url, caption: "", label: "" })),
-            videos,
-            simulations,
-            buildLogs,
-            downloads,
-            createdAt: new Date().toISOString()
-        });
+            cover_image_url: coverUrl || null,
+            github_url: githubUrl || null,
+            demo_video_url: null, // UI doesn't explicitly have this in the top level yet
+            // The API doesn't fully support all detailed fields yet (BOM, steps, etc.),
+            // but we pass them along or store them if the backend accepts extra body fields.
+            content: {
+                bom: bomRows,
+                buildSteps,
+                codeFiles,
+                prerequisites,
+                tools,
+                designDecisions,
+                objectives,
+                docsUrl,
+                version,
+                license,
+                safetyNotice,
+                schematics,
+                pcbLayers,
+                pcbBoardSpecs,
+                designRules,
+                signalNotes,
+                dependencies,
+                buildInstructions,
+                envSetup,
+                testSuite,
+                galleryImages: galleryImages.map(url => ({ url, caption: "", label: "" })),
+                videos,
+                simulations,
+                buildLogs,
+                downloads,
+            }
+        };
 
         const tid = toast.loading("Publishing artifact…");
-        setTimeout(() => {
+        try {
+            const result = await api.createProject(payload);
             toast.success(publishStatus === "published" ? "🚀 Artifact Published!" : "Draft Saved", {
                 id: tid,
                 description: publishStatus === "published" ? `${title} is now live in the laboratory.` : `${title} saved as draft.`,
-                action: { label: "View", onClick: () => router.push(`/project/${newId}`) },
+                action: { label: "View", onClick: () => router.push(`/project/${result.id}`) },
             });
             router.push("/dashboard");
-        }, 800);
+        } catch (e: any) {
+            toast.error("Failed to publish artifact", {
+                id: tid,
+                description: e.message || "An unknown error occurred."
+            });
+        }
     };
 
     const inputCls = "w-full h-12 px-5 rounded-2xl bg-card border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm text-foreground placeholder:text-muted-foreground/60";

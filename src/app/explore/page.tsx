@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Cpu, Bot, Brain, Server, Binary,
   ChevronDown, Filter, Star, MessageSquare, Bell, Plus,
   ArrowRight, GitFork, Download, Share2, ExternalLink,
   Flame, LayoutGrid, History, Menu, X, Sun, Moon,
   ArrowUpDown, TrendingUp, Clock, Zap, Bookmark, ArrowLeft,
-  Box, HardDrive, Wifi
+  Box, HardDrive, Wifi, AlertCircle, RefreshCw
 } from "lucide-react";
-import { useProjectsStore } from "@/stores/projectsStore";
-import { type Project } from "@/mockData/projects";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
+import { api, buildQueryString } from "@/lib/api";
+import type { ApiProject } from "@/lib/api-types";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -24,21 +24,75 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+/* ─── Loading Skeleton ─── */
+const ProjectCardSkeleton = () => (
+  <div className="bg-card/60 backdrop-blur-xl rounded-[24px] border border-border/50 overflow-hidden flex flex-col animate-pulse">
+    <div className="aspect-[16/10] bg-muted/50" />
+    <div className="p-7 flex-1 flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-muted/60" />
+        <div className="h-3 w-24 rounded-full bg-muted/60" />
+      </div>
+      <div className="h-5 w-3/4 rounded-full bg-muted/60" />
+      <div className="h-3 w-full rounded-full bg-muted/60" />
+      <div className="h-3 w-5/6 rounded-full bg-muted/50" />
+      <div className="flex gap-2 mt-2">
+        <div className="h-6 w-16 rounded-xl bg-muted/40" />
+        <div className="h-6 w-16 rounded-xl bg-muted/40" />
+        <div className="h-6 w-16 rounded-xl bg-muted/40" />
+      </div>
+    </div>
+  </div>
+);
+
+/* ─── Error State ─── */
+const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
+  <div className="col-span-full py-40 flex flex-col items-center text-center">
+    <div className="w-24 h-24 rounded-[32px] bg-rose-500/10 border-2 border-rose-500/20 flex items-center justify-center mb-10">
+      <AlertCircle size={40} className="text-rose-500/60" />
+    </div>
+    <h3 className="text-3xl font-black font-display mb-6">Signal Lost</h3>
+    <p className="text-muted-foreground max-w-md mx-auto font-medium mb-12">
+      Failed to load projects. Check your connection and try again.
+    </p>
+    <Button
+      variant="secondary"
+      className="px-12 h-14 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em]"
+      icon={<RefreshCw size={16} />}
+      onClick={onRetry}
+    >
+      Retry
+    </Button>
+  </div>
+);
+
 /* ─── Project Card ─── */
-const ProjectCard = ({ project }: { project: Project }) => {
-  const { starredIds, toggleStar, bookmarkedIds, toggleBookmark, forkProject } = useProjectsStore();
+const ProjectCard = ({ project }: { project: ApiProject }) => {
   const { user: authUser, isAuthenticated } = useAuthStore();
-  const isStarred = starredIds.has(project.id);
-  const isBookmarked = bookmarkedIds.has(project.id);
-  const starCount = project.stars;
+  const [isStarred, setIsStarred] = useState(false);
+  const [localStarCount, setLocalStarCount] = useState(project.star_count);
   const router = useRouter();
 
-  const handleStar = (e: React.MouseEvent) => {
+  const handleStar = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleStar(project.id);
-    toast.success(isStarred ? "Removed from library" : "Project starred!", {
-      description: isStarred ? `Removed ${project.title}` : `Added ${project.title} to your library.`,
-    });
+    if (!isAuthenticated) {
+      toast.error("Please log in to continue", { description: "Sign in to star projects." });
+      return;
+    }
+    // Optimistic update
+    const wasStarred = isStarred;
+    const prevCount = localStarCount;
+    setIsStarred(!wasStarred);
+    setLocalStarCount(wasStarred ? prevCount - 1 : prevCount + 1);
+    toast.success(wasStarred ? "Star removed" : "Project starred ⭐");
+    try {
+      await api.toggleStar(project.id);
+    } catch {
+      // Rollback on error
+      setIsStarred(wasStarred);
+      setLocalStarCount(prevCount);
+      toast.error("Something went wrong. Please try again");
+    }
   };
 
   const handleReplicate = (e: React.MouseEvent) => {
@@ -53,20 +107,41 @@ const ProjectCard = ({ project }: { project: Project }) => {
     }, 2000);
   };
 
-  const handleFork = (e: React.MouseEvent) => {
+  const handleFork = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAuthenticated || !authUser) {
-      toast.error("Login Required", { description: "Please login to fork projects." });
+    if (!isAuthenticated) {
+      toast.error("Please log in to continue", { description: "Please login to fork projects." });
       return;
     }
-    const newId = forkProject(project.id, authUser.id, `@${authUser.username}`, authUser.avatar);
-    toast.success("Workspace Created", {
-      description: `Forked ${project.title} to your laboratory.`,
-    });
-    router.push(`/project/${newId}/edit`);
+    const loadId = toast.loading("Forking project…");
+    try {
+      const forked = await api.forkProject(project.id);
+      toast.success("Project forked successfully", { id: loadId, description: `Forked to your drafts.` });
+      router.push(`/project/${forked.id}`);
+    } catch (err) {
+      toast.error("Something went wrong. Please try again", { id: loadId });
+    }
   };
 
   const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
+  // Map project_type to a display category label
+  const categoryLabel = project.project_type.replace('_', '/').replace('AI/ML', 'AI/ML').replace('IOT', 'IoT');
+  const categoryStyleMap: Record<string, string> = {
+    ELECTRONICS: "bg-emerald-100/90 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/50 backdrop-blur-xl shadow-lg",
+    HARDWARE: "bg-blue-100/90 dark:bg-blue-950/90 text-blue-800 dark:text-blue-300 border-blue-200/50 dark:border-blue-800/50 backdrop-blur-xl shadow-lg",
+    ROBOTICS: "bg-orange-100/90 dark:bg-orange-950/90 text-orange-800 dark:text-orange-300 border-orange-200/50 dark:border-orange-800/50 backdrop-blur-xl shadow-lg",
+    SOFTWARE: "bg-rose-100/90 dark:bg-rose-950/90 text-rose-800 dark:text-rose-300 border-rose-200/50 dark:border-rose-800/50 backdrop-blur-xl shadow-lg",
+    AI_ML: "bg-violet-100/90 dark:bg-violet-950/90 text-violet-800 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/50 backdrop-blur-xl shadow-lg",
+    IOT: "bg-cyan-100/90 dark:bg-cyan-950/90 text-cyan-800 dark:text-cyan-300 border-cyan-200/50 dark:border-cyan-800/50 backdrop-blur-xl shadow-lg",
+    MECHANICAL: "bg-amber-100/90 dark:bg-amber-950/90 text-amber-800 dark:text-amber-300 border-amber-200/50 dark:border-amber-800/50 backdrop-blur-xl shadow-lg",
+    DESIGN: "bg-pink-100/90 dark:bg-pink-950/90 text-pink-800 dark:text-pink-300 border-pink-200/50 dark:border-pink-800/50 backdrop-blur-xl shadow-lg",
+    RESEARCH: "bg-indigo-100/90 dark:bg-indigo-950/90 text-indigo-800 dark:text-indigo-300 border-indigo-200/50 dark:border-indigo-800/50 backdrop-blur-xl shadow-lg",
+    OTHER: "bg-gray-100/90 dark:bg-gray-950/90 text-gray-800 dark:text-gray-300 border-gray-200/50 dark:border-gray-800/50 backdrop-blur-xl shadow-lg",
+  };
+  const categoryStyles = categoryStyleMap[project.project_type] ?? categoryStyleMap.OTHER;
+  const authorUsername = project.author?.username ?? 'unknown';
+  const authorAvatar = project.author?.avatar_url ?? `https://i.pravatar.cc/150?u=${project.author_id}`;
 
   return (
     <motion.article
@@ -79,25 +154,25 @@ const ProjectCard = ({ project }: { project: Project }) => {
         <img
           alt={project.title}
           className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-          src={project.image}
+          src={project.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        <span className={`absolute left-4 top-4 rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest ${project.categoryStyles}`}>
-          {project.category}
+        <span className={`absolute left-4 top-4 rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest ${categoryStyles}`}>
+          {categoryLabel}
         </span>
         <span className="absolute right-4 top-4 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest backdrop-blur-xl border border-white/20 bg-white/90 text-black dark:bg-black/80 dark:text-white/90 shadow-lg">
-          {project.level}
+          {project.difficulty}
         </span>
       </Link>
 
       <div className="p-7 flex-1 flex flex-col">
         <div className="mb-5 flex items-center gap-3">
-          <Link href={`/user/${project.author}`} className="relative group/avatar">
-            <img alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-border/50 shadow-sm group-hover/avatar:border-primary transition-all" src={project.authorAvatar} />
+          <Link href={`/user/${authorUsername}`} className="relative group/avatar">
+            <img alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-border/50 shadow-sm group-hover/avatar:border-primary transition-all" src={authorAvatar} />
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
           </Link>
           <span className="text-[10px] font-bold text-muted-foreground group-hover:text-primary transition-colors tracking-[0.15em] uppercase">
-            @{project.author}
+            @{authorUsername}
           </span>
         </div>
 
@@ -107,7 +182,7 @@ const ProjectCard = ({ project }: { project: Project }) => {
           </h3>
         </Link>
         <p className="mb-6 text-sm leading-relaxed text-muted-foreground/80 line-clamp-2 font-medium">
-          {project.description}
+          {project.tagline ?? project.description ?? ''}
         </p>
 
         <div className="flex flex-wrap gap-2 mb-7">
@@ -130,14 +205,14 @@ const ProjectCard = ({ project }: { project: Project }) => {
         <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-5 text-[10px] font-black text-muted-foreground tracking-[0.2em] uppercase">
           <div className="flex gap-5">
             <button onClick={handleStar} className={`flex items-center gap-2 transition-all duration-300 ${isStarred ? "text-amber-500 scale-105" : "hover:text-foreground"}`}>
-              <Star size={15} className={isStarred ? "fill-amber-500" : ""} /> {fmt(starCount)}
+              <Star size={15} className={isStarred ? "fill-amber-500" : ""} /> {fmt(localStarCount)}
             </button>
             <span className="flex items-center gap-2 hover:text-foreground cursor-default">
-              <GitFork size={15} /> {fmt(project.forks)}
+              <GitFork size={15} /> {fmt(project.fork_count)}
             </span>
           </div>
           <span className="flex items-center gap-2 hover:text-foreground cursor-default">
-            <MessageSquare size={15} /> {project.comments}
+            <MessageSquare size={15} /> {fmt(project.comment_count)}
           </span>
         </div>
       </div>
@@ -228,11 +303,39 @@ const NotificationsDropdown = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
+// Map category UI labels → backend project_type values
+const CATEGORY_TYPE_MAP: Record<string, string | null> = {
+  "All": null,
+  "Electronics": "ELECTRONICS",
+  "Hardware": "HARDWARE",
+  "Robotics": "ROBOTICS",
+  "Software": "SOFTWARE",
+  "AI/ML": "AI_ML",
+  "3D Print": "OTHER",
+  "Mechanics": "MECHANICAL",
+  "IoT": "IOT",
+};
+
+const SORT_MAP: Record<string, string> = {
+  "Trending": "trending",
+  "Newest": "latest",
+  "Most Starred": "starred",
+  "Most Forked": "trending",
+  "Most Viewed": "viewed",
+};
+
+const DIFFICULTY_MAP: Record<string, string | null> = {
+  "Any": null,
+  "Beginner": "BEGINNER",
+  "Intermediate": "INTERMEDIATE",
+  "Advanced": "ADVANCED",
+  "Expert": "EXPERT",
+};
+
 /* ─── Main Page ─── */
 export default function ExplorePage() {
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, logout, user: authUser } = useAuthStore();
-  const { projects } = useProjectsStore();
   const { unreadCount: unreadNotifs } = useNotificationStore();
   const router = useRouter();
 
@@ -250,6 +353,48 @@ export default function ExplorePage() {
   const [showMoreCats, setShowMoreCats] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+
+  // ── API State ──────────────────────────────────────────────────────────────
+  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchProjects = useCallback(async (search?: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = buildQueryString({
+        type: CATEGORY_TYPE_MAP[selectedCategory] ?? undefined,
+        difficulty: DIFFICULTY_MAP[difficulty] ?? undefined,
+        sort: SORT_MAP[sortBy] ?? "trending",
+        search: search !== undefined ? search : searchQuery,
+        limit: 20,
+      });
+      const result = await api.getProjects(params || undefined);
+      setProjects(result.projects ?? []);
+      setTotalCount(result.total ?? 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load projects");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCategory, difficulty, sortBy, searchQuery]);
+
+  // Fetch on filter change (immediate, no debounce)
+  useEffect(() => {
+    fetchProjects();
+  }, [selectedCategory, difficulty, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      fetchProjects(searchQuery);
+    }, 300);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = [
     { name: "All", icon: LayoutGrid },
@@ -287,24 +432,7 @@ export default function ExplorePage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const sorted = [...projects].sort((a, b) => {
-    if (sortBy === "Newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    if (sortBy === "Most Starred") return b.stars - a.stars;
-    if (sortBy === "Most Forked") return b.forks - a.forks;
-    if (sortBy === "Most Viewed") return b.views - a.views;
-    return b.stars * 0.5 + b.views * 0.3 + b.forks * 0.2 - (a.stars * 0.5 + a.views * 0.3 + a.forks * 0.2);
-  });
-
-  const filteredProjects = sorted.filter(p => {
-    const matchCat = selectedCategory === "All" || p.category === selectedCategory;
-    const matchSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      p.author.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchDiff = difficulty === "Any" || (p.level && p.level.toLowerCase() === difficulty.toLowerCase());
-    return matchCat && matchSearch && matchDiff;
-  });
-
-  const featuredProject = sorted[0];
+  const featuredProject = projects[0] ?? null;
 
   const handleCreate = () => {
     if (!isAuthenticated) {
@@ -385,7 +513,7 @@ export default function ExplorePage() {
 
                   <Link href="/dashboard">
                     <div className="relative group cursor-pointer">
-                      <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary transition-all" src={authUser?.avatar} />
+                      <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary transition-all" src={authUser?.avatar_url ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
                       <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                     </div>
                   </Link>
@@ -442,7 +570,7 @@ export default function ExplorePage() {
 
             {/* ─── Featured Hero (hidden during search) ─── */}
             <AnimatePresence>
-              {!searchQuery && (
+              {!searchQuery && featuredProject && !isLoading && (
                 <motion.section
                   key="hero"
                   initial={{ opacity: 1, height: "auto" }}
@@ -456,22 +584,26 @@ export default function ExplorePage() {
                       <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500">Laboratory Trending</h2>
                     </div>
                     <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-muted/30 border border-border text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                      <History size={13} /> Last Updated: Mar 1
+                      <History size={13} /> Live Data
                     </div>
                   </div>
 
                   <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                     className="relative h-[500px] md:h-[600px] rounded-[48px] overflow-hidden border border-border group cursor-pointer shadow-3xl">
-                    <img src={featuredProject.image} className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="Featured" />
+                    <img
+                      src={featuredProject.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80`}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                      alt="Featured"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
                     <div className="absolute bottom-0 left-0 p-10 md:p-16 w-full max-w-5xl">
                       <div className="flex gap-4 mb-8">
                         <span className="px-6 py-2 rounded-full bg-primary text-white text-[10px] font-black uppercase tracking-widest shadow-glow-cyan">Featured Artifact</span>
-                        <span className="px-6 py-2 rounded-full bg-white/10 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-widest border border-white/20">{featuredProject.category}</span>
+                        <span className="px-6 py-2 rounded-full bg-white/10 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-widest border border-white/20">{featuredProject.project_type}</span>
                       </div>
                       <h1 className="text-4xl md:text-6xl lg:text-7xl font-black font-display text-white mb-8 leading-[1.1] tracking-tight">{featuredProject.title}</h1>
-                      <p className="text-lg md:text-xl text-white/70 mb-12 line-clamp-2 font-medium max-w-3xl">{featuredProject.description}</p>
+                      <p className="text-lg md:text-xl text-white/70 mb-12 line-clamp-2 font-medium max-w-3xl">{featuredProject.tagline ?? featuredProject.description ?? ''}</p>
                       <div className="flex flex-wrap items-center gap-6">
                         <Link href={`/project/${featuredProject.id}`}>
                           <Button variant="primary" icon={<ArrowRight size={20} />} className="px-10 h-14 md:h-16 rounded-3xl text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/40">
@@ -479,7 +611,7 @@ export default function ExplorePage() {
                           </Button>
                         </Link>
                         <div className="flex items-center gap-4 text-white/60 text-[10px] font-black uppercase tracking-widest">
-                          <Star size={16} className="text-amber-400" /> {featuredProject.stars.toLocaleString()} stars
+                          <Star size={16} className="text-amber-400" /> {featuredProject.star_count.toLocaleString()} stars
                         </div>
                       </div>
                     </div>
@@ -491,10 +623,7 @@ export default function ExplorePage() {
             {/* ─── Filter Bar ─── */}
             <section className="mb-20">
               <div className="bg-card/40 backdrop-blur-xl border border-border p-5 md:p-7 rounded-[36px] shadow-sm">
-                {/* Top row: categories grid + right-side controls */}
                 <div className="flex items-start gap-6">
-
-                  {/* ── Categories: 2-row grid ── */}
                   <div className="flex-1">
                     <div className={`grid gap-2.5 ${showMoreCats ? "grid-cols-3 md:grid-cols-4 lg:grid-cols-6" : "grid-cols-3 md:grid-cols-6"}`}>
                       {(showMoreCats ? categories : categories.slice(0, 6)).map(cat => (
@@ -518,9 +647,7 @@ export default function ExplorePage() {
                     )}
                   </div>
 
-                  {/* ── Right-side: difficulty + sort ── */}
                   <div className="flex flex-col items-end gap-3 shrink-0 ml-auto">
-                    {/* Difficulty pill row */}
                     <div className="flex p-1.5 bg-muted/50 rounded-full border border-border shadow-inner">
                       {["Any", "Beginner", "Intermediate", "Advanced", "Expert"].map(l => (
                         <button key={l} onClick={() => setDifficulty(l)}
@@ -529,7 +656,6 @@ export default function ExplorePage() {
                         </button>
                       ))}
                     </div>
-                    {/* Sort — fixed right, high z-index */}
                     <div ref={sortRef} className="relative">
                       <button onClick={() => setSortOpen(!sortOpen)}
                         className="flex items-center gap-2.5 px-5 h-11 rounded-full bg-card border border-border text-foreground font-black text-[10px] uppercase tracking-widest hover:border-primary/50 transition-all shadow-sm">
@@ -559,20 +685,31 @@ export default function ExplorePage() {
               <div className="flex items-center gap-5 mb-14">
                 <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-muted-foreground/50 whitespace-nowrap">
                   {searchQuery
-                    ? <>Results for <span className="text-primary">&quot;{searchQuery}&quot;</span></>
+                    ? <><span>Results for </span><span className="text-primary">"{searchQuery}"</span></>
                     : selectedCategory === "All" ? "Laboratory Records" : `${selectedCategory} Systems`
                   }
                 </h3>
                 <div className="h-px w-full bg-gradient-to-r from-border to-transparent" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30 whitespace-nowrap">
-                  {filteredProjects.length} Entries
-                </span>
+                {!isLoading && !error && (
+                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/30 whitespace-nowrap">
+                    {totalCount} Entries
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-12">
                 <AnimatePresence mode="popLayout">
-                  {filteredProjects.length > 0 ? (
-                    filteredProjects.map(p => <ProjectCard key={p.id} project={p} />)
+                  {isLoading ? (
+                    // Loading skeleton
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <motion.div key={`skeleton-${i}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <ProjectCardSkeleton />
+                      </motion.div>
+                    ))
+                  ) : error ? (
+                    <ErrorState onRetry={fetchProjects} />
+                  ) : projects.length > 0 ? (
+                    projects.map(p => <ProjectCard key={p.id} project={p} />)
                   ) : (
                     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                       className="col-span-full py-40 flex flex-col items-center text-center">
@@ -590,7 +727,7 @@ export default function ExplorePage() {
                 </AnimatePresence>
               </div>
 
-              {filteredProjects.length > 0 && (
+              {!isLoading && !error && projects.length > 0 && (
                 <div className="mt-24 flex flex-col items-center gap-8">
                   <div className="w-16 h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-full" />
                   <Button variant="ghost" className="px-12 h-14 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] border border-border bg-card/40 hover:bg-muted/50">

@@ -28,6 +28,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
+import AuthProvider from "@/components/ui/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -40,7 +41,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${inter.variable} antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Toaster position="bottom-right" theme="dark" closeButton richColors />
       </body>
     </html>

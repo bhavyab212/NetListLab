@@ -27,18 +27,18 @@ export default function ProfileSettingsPage() {
     const { isAuthenticated, user: authUser, updateProfile } = useAuthStore();
     const router = useRouter();
 
-    const [fullName, setFullName] = useState(authUser?.fullName ?? "");
+    const [fullName, setFullName] = useState(authUser?.full_name ?? authUser?.fullName ?? "");
     const [username, setUsername] = useState(authUser?.username ?? "");
     const [bio, setBio] = useState(authUser?.bio ?? "");
-    const [role, setRole] = useState(authUser?.role ?? "");
+    const [role, setRole] = useState(authUser?.current_role ?? authUser?.role ?? "");
     const [institution, setInstitution] = useState(authUser?.institution ?? "");
     const [location, setLocation] = useState(authUser?.location ?? "");
-    const [avatar, setAvatar] = useState(authUser?.avatar ?? "");
-    const [skills, setSkills] = useState<string[]>(authUser?.skills ?? []);
-    const [github, setGithub] = useState("");
-    const [twitter, setTwitter] = useState("");
-    const [linkedin, setLinkedin] = useState("");
-    const [website, setWebsite] = useState("");
+    const [avatar, setAvatar] = useState(authUser?.avatar_url ?? authUser?.avatar ?? "");
+    const [skills, setSkills] = useState<string[]>(authUser?.skill_tags ?? authUser?.skills ?? []);
+    const [github, setGithub] = useState(authUser?.github_url ?? authUser?.github ?? "");
+    const [twitter, setTwitter] = useState(authUser?.twitter_url ?? authUser?.twitter ?? "");
+    const [linkedin, setLinkedin] = useState(authUser?.linkedin_url ?? authUser?.linkedin ?? "");
+    const [website, setWebsite] = useState(authUser?.website_url ?? authUser?.website ?? "");
     const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
@@ -52,14 +52,30 @@ export default function ProfileSettingsPage() {
         setIsDirty(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!fullName.trim()) { toast.error("Full name is required."); return; }
         const tid = toast.loading("Saving profile…");
-        setTimeout(() => {
-            updateProfile({ fullName, username, bio, role, institution, location, avatar, skills });
+        try {
+            const updated = await import("@/lib/api").then(m => m.api.updateMe({
+                full_name: fullName,
+                username,
+                bio,
+                current_role: role,
+                institution,
+                location,
+                avatar_url: avatar,
+                skill_tags: skills,
+                github_url: github,
+                twitter_url: twitter,
+                linkedin_url: linkedin,
+                website_url: website,
+            }));
+            updateProfile(updated as Parameters<typeof updateProfile>[0]);
             toast.success("Profile Updated", { id: tid, description: "Changes saved to your laboratory profile." });
             setIsDirty(false);
-        }, 900);
+        } catch {
+            toast.error("Save failed", { id: tid, description: "Could not reach the server. Try again." });
+        }
     };
 
     const inputCls = "w-full h-12 px-5 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40";

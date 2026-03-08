@@ -6,7 +6,8 @@ import {
     ShoppingCart, Tag, Code, FileText,
     Cpu, Server, Bot, Brain, Box, HardDrive, Wifi, Binary
 } from "lucide-react";
-import { useProjectsStore } from "@/stores/projectsStore";
+import { api } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion } from "framer-motion";
@@ -35,13 +36,57 @@ interface BOMRow { name: string; category: string; qty: number; price: string; s
 interface BuildStep { title: string; body: string; time: string; imageUrl: string; }
 interface CodeFile { name: string; language: string; content: string; id: string; }
 
-export default function ProjectEditPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ProjectEditPageWrapper({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const { isDark } = useThemeStore();
+    const router = useRouter();
+    const [project, setProject] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        api.getProject(id).then(p => {
+            const bridgeObj = {
+                ...p,
+                image: p.cover_image_url ?? "",
+                category: p.project_type ?? "",
+                level: p.difficulty ?? "",
+                ...(typeof (p as any).content === 'object' && (p as any).content !== null ? (p as any).content : {})
+            };
+            setProject(bridgeObj);
+            setLoading(false);
+        }).catch(() => {
+            setProject(null);
+            setLoading(false);
+        });
+    }, [id]);
+
+    if (loading) {
+        return (
+            <div className={`min-h-screen flex items-center justify-center ${isDark ? "dark bg-background" : "bg-background"}`}>
+                <Loader2 size={40} className="animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!project) {
+        return (
+            <div className={`min-h-screen flex items-center justify-center ${isDark ? "dark bg-background" : "bg-background"}`}>
+                <div className="text-center p-12 rounded-[32px] bg-card border border-border shadow-2xl max-w-md">
+                    <AlertTriangle size={40} className="text-amber-500 mx-auto mb-6" />
+                    <h1 className="text-3xl font-black font-display mb-4 text-foreground">Project Not Found</h1>
+                    <Button variant="primary" fullWidth onClick={() => router.push("/dashboard")} className="h-14 rounded-2xl font-black uppercase tracking-widest">Go to Dashboard</Button>
+                </div>
+            </div>
+        );
+    }
+
+    return <ProjectEditPageImpl id={id} project={project} />;
+}
+
+function ProjectEditPageImpl({ id, project }: { id: string, project: any }) {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated, user: authUser } = useAuthStore();
     const router = useRouter();
-    const { projects, updateProject } = useProjectsStore();
-    const project = projects.find(p => p.id === parseInt(id));
 
     const [title, setTitle] = useState(project?.title ?? "");
     const [category, setCategory] = useState(project?.category ?? "");
@@ -100,45 +145,48 @@ export default function ProjectEditPage({ params }: { params: Promise<{ id: stri
     useEffect(() => {
         if (!isAuthenticated) { router.push("/login"); return; }
         if (!project) return;
-        if (project.authorId !== authUser?.id) {
+        // In backend, author_id is the user id
+        if (project.author_id !== authUser?.id) {
             toast.error("Unauthorized", { description: "You can only edit your own projects." });
             router.push("/dashboard");
         }
     }, [isAuthenticated, project, router, authUser]);
-
-    if (!project) {
-        return (
-            <div className={`min-h-screen flex items-center justify-center ${isDark ? "dark bg-background" : "bg-background"}`}>
-                <div className="text-center p-12 rounded-[32px] bg-card border border-border shadow-2xl max-w-md">
-                    <AlertTriangle size={40} className="text-amber-500 mx-auto mb-6" />
-                    <h1 className="text-3xl font-black font-display mb-4 text-foreground">Project Not Found</h1>
-                    <Button variant="primary" fullWidth onClick={() => router.push("/dashboard")} className="h-14 rounded-2xl font-black uppercase tracking-widest">Go to Dashboard</Button>
-                </div>
-            </div>
-        );
-    }
 
     const addTag = () => {
         const t = tagInput.trim();
         if (t && !tags.includes(t)) { setTags([...tags, t]); setTagInput(""); setIsDirty(true); }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!project) return;
         const tid = toast.loading("Saving changes…");
-        updateProject(project.id, {
-            title, category, difficulty, description, image: coverUrl, tags, status,
-            version, license, safetyNotice,
-            bom: bomRows, buildSteps, codeFiles,
-            prerequisites, tools, objectives, designDecisions, githubUrl, docsUrl,
-            schematics, pcbLayers, pcbBoardSpecs, designRules, signalNotes,
-            dependencies, buildInstructions, envSetup, testSuite,
-            galleryImages, videos, simulations, buildLogs, downloads
-        });
-        setTimeout(() => {
+
+        const payload = {
+            title,
+            description,
+            project_type: category || "Digital",
+            difficulty: difficulty || "Beginner",
+            status: status === "published" ? "PUBLISHED" : "DRAFT",
+            tags,
+            cover_image_url: coverUrl || null,
+            github_url: githubUrl || null,
+            content: {
+                bom: bomRows, buildSteps, codeFiles,
+                prerequisites, tools, objectives, designDecisions, docsUrl,
+                version, license, safetyNotice,
+                schematics, pcbLayers, pcbBoardSpecs, designRules, signalNotes,
+                dependencies, buildInstructions, envSetup, testSuite,
+                galleryImages, videos, simulations, buildLogs, downloads
+            }
+        };
+
+        try {
+            await api.updateProject(project.id, payload);
             toast.success("Changes Saved", { id: tid, description: `${title} has been updated.` });
             setIsDirty(false);
-        }, 1000);
+        } catch (e: any) {
+            toast.error("Failed to save", { id: tid, description: e.message || "Unknown error occurred" });
+        }
     };
 
     const addBOMRow = () => { setBomRows([...bomRows, { name: "", category: "", qty: 1, price: "", supplier: "", link: "" }]); setIsDirty(true); };

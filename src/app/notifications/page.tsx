@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import {
     ArrowLeft, Bell, Check, Trash2, Star, GitFork, MessageSquare,
-    UserPlus, Reply, Sun, Moon, Inbox
+    UserPlus, Reply, Sun, Moon, Inbox, Loader2
 } from "lucide-react";
-import { useNotificationStore } from "@/stores/notificationStore";
-import { type Notification } from "@/mockData/notifications";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +14,12 @@ import Logo from "@/components/ui/Logo";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { ApiNotification } from "@/lib/api-types";
+import { toast } from "sonner";
+
+// Map API uppercase type → display
+const typeKey = (t: string) => t.toLowerCase() as "star" | "fork" | "comment" | "follow" | "reply";
 
 const typeStyles: Record<string, { color: string; bg: string; border: string; Icon: React.ElementType }> = {
     star: { color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20", Icon: Star },
@@ -34,11 +38,24 @@ const timeAgo = (iso: string) => {
     return `${Math.floor(h / 24)}d ago`;
 };
 
+const notifMessage = (n: ApiNotification): string => {
+    switch (n.type) {
+        case "STAR": return "starred your project";
+        case "FORK": return "forked your project";
+        case "COMMENT": return "commented on your project";
+        case "FOLLOW": return "followed you";
+        case "REPLY": return "replied to your comment on";
+        default: return "interacted with you";
+    }
+};
+
 export default function NotificationsPage() {
     const { isDark, toggle } = useThemeStore();
     const { isAuthenticated } = useAuthStore();
     const router = useRouter();
-    const { notifications: notifs, unreadCount, markAllRead, markAsRead, deleteNotification, clearAll } = useNotificationStore();
+
+    const [notifs, setNotifs] = useState<ApiNotification[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState("all");
 
     const [isMounted, setIsMounted] = useState(false);
@@ -48,11 +65,37 @@ export default function NotificationsPage() {
         if (isMounted && !isAuthenticated) router.push("/login");
     }, [isMounted, isAuthenticated, router]);
 
-    const filters = ["all", "star", "fork", "comment", "follow", "reply"];
-    const visible = filter === "all" ? notifs : notifs.filter(n => n.type === filter);
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        let mounted = true;
+        api.getNotifications()
+            .then(data => { if (mounted) setNotifs(data); })
+            .catch(() => { })
+            .finally(() => { if (mounted) setIsLoading(false); });
+        return () => { mounted = false; };
+    }, [isAuthenticated]);
 
-    const markRead = (id: string) => markAsRead(id);
-    const clear = (id: string) => deleteNotification(id);
+    const unreadCount = notifs.filter(n => !n.is_read).length;
+    const filters = ["all", "star", "fork", "comment", "follow", "reply"];
+    const visible = filter === "all" ? notifs : notifs.filter(n => typeKey(n.type) === filter);
+
+    const markRead = async (id: string) => {
+        setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        await api.markOneRead(id).catch(() => { });
+    };
+
+    const markAllRead = async () => {
+        setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+        await api.markAllRead().catch(() => {
+            toast.error("Failed to mark all read");
+        });
+    };
+
+    const clearAll = () => {
+        // Local only — real delete endpoint not available; just hide them
+        setNotifs([]);
+        toast.success("Inbox cleared");
+    };
 
     if (!isMounted || !isAuthenticated) return null;
 
@@ -116,46 +159,62 @@ export default function NotificationsPage() {
                             })}
                         </div>
 
+                        {/* Loading */}
+                        {isLoading && (
+                            <div className="py-40 flex flex-col items-center">
+                                <Loader2 size={36} className="animate-spin text-primary mb-4" />
+                                <p className="text-muted-foreground font-medium text-sm">Loading transmissions…</p>
+                            </div>
+                        )}
+
                         {/* Notifications List */}
-                        <AnimatePresence mode="popLayout">
-                            {visible.length === 0 ? (
-                                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="py-40 flex flex-col items-center text-center">
-                                    <div className="w-20 h-20 rounded-[28px] bg-muted/40 border-2 border-border flex items-center justify-center mb-8"><Inbox size={36} className="text-muted-foreground/20" /></div>
-                                    <h3 className="text-2xl font-black font-display mb-3">All Clear</h3>
-                                    <p className="text-muted-foreground font-medium max-w-sm">No transmissions in this channel. Your lab is quiet.</p>
-                                </motion.div>
-                            ) : visible.map(n => {
-                                const s = typeStyles[n.type] ?? typeStyles.star;
-                                return (
-                                    <motion.div key={n.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                                        className={`flex items-start gap-5 p-6 rounded-[24px] border mb-3 transition-all cursor-pointer ${!n.read ? "bg-primary/5 border-primary/10 hover:bg-primary/8" : "bg-card/40 border-border/50 hover:border-primary/20"}`}
-                                        onClick={() => markRead(n.id)}>
-                                        <div className={`p-3 rounded-2xl border shrink-0 ${s.bg} ${s.border} ${s.color}`}><s.Icon size={17} /></div>
-                                        <img src={n.actorAvatar} alt={n.actor} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-foreground leading-snug">
-                                                <Link href={`/user/${n.actorId}`} className="font-black text-primary hover:underline" onClick={e => e.stopPropagation()}>@{n.actor}</Link>{" "}
-                                                {n.message}
-                                                {n.projectTitle && n.projectId && (
-                                                    <Link href={`/project/${n.projectId}`} className="font-black hover:text-primary transition-colors" onClick={e => e.stopPropagation()}> "{n.projectTitle}"</Link>
-                                                )}
-                                            </p>
-                                            <div className="flex items-center gap-3 mt-2">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.bg} ${s.border} ${s.color}`}>{n.type}</span>
-                                                <span className="text-[10px] font-bold text-muted-foreground/40">{timeAgo(n.createdAt)}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            {!n.read && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                                            <button onClick={e => { e.stopPropagation(); clear(n.id); }}
-                                                className="p-2 rounded-xl text-muted-foreground/40 hover:text-rose-500 hover:bg-rose-500/5 transition-all opacity-0 group-hover:opacity-100">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
+                        {!isLoading && (
+                            <AnimatePresence mode="popLayout">
+                                {visible.length === 0 ? (
+                                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="py-40 flex flex-col items-center text-center">
+                                        <div className="w-20 h-20 rounded-[28px] bg-muted/40 border-2 border-border flex items-center justify-center mb-8"><Inbox size={36} className="text-muted-foreground/20" /></div>
+                                        <h3 className="text-2xl font-black font-display mb-3">All Clear</h3>
+                                        <p className="text-muted-foreground font-medium max-w-sm">No transmissions in this channel. Your lab is quiet.</p>
                                     </motion.div>
-                                );
-                            })}
-                        </AnimatePresence>
+                                ) : visible.map(n => {
+                                    const tk = typeKey(n.type);
+                                    const s = typeStyles[tk] ?? typeStyles.star;
+                                    const actorUsername = n.actor?.username ?? "unknown";
+                                    const actorAvatar = n.actor?.avatar_url ?? `https://i.pravatar.cc/100?u=${n.actor_id}`;
+                                    const projectTitle = n.project?.title;
+                                    const projectId = n.project_id;
+
+                                    return (
+                                        <motion.div key={n.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                                            className={`flex items-start gap-5 p-6 rounded-[24px] border mb-3 transition-all cursor-pointer ${!n.is_read ? "bg-primary/5 border-primary/10 hover:bg-primary/8" : "bg-card/40 border-border/50 hover:border-primary/20"}`}
+                                            onClick={() => markRead(n.id)}>
+                                            <div className={`p-3 rounded-2xl border shrink-0 ${s.bg} ${s.border} ${s.color}`}><s.Icon size={17} /></div>
+                                            <img src={actorAvatar} alt={actorUsername} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground leading-snug">
+                                                    <Link href={`/user/${actorUsername}`} className="font-black text-primary hover:underline" onClick={e => e.stopPropagation()}>@{actorUsername}</Link>{" "}
+                                                    {notifMessage(n)}
+                                                    {projectTitle && projectId && (
+                                                        <Link href={`/project/${projectId}`} className="font-black hover:text-primary transition-colors" onClick={e => e.stopPropagation()}> &ldquo;{projectTitle}&rdquo;</Link>
+                                                    )}
+                                                </p>
+                                                <div className="flex items-center gap-3 mt-2">
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${s.bg} ${s.border} ${s.color}`}>{tk}</span>
+                                                    <span className="text-[10px] font-bold text-muted-foreground/40">{timeAgo(n.created_at)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                                                <button onClick={e => { e.stopPropagation(); setNotifs(prev => prev.filter(x => x.id !== n.id)); }}
+                                                    className="p-2 rounded-xl text-muted-foreground/40 hover:text-rose-500 hover:bg-rose-500/5 transition-all">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </AnimatePresence>
+                        )}
                     </div>
                 </main>
             </div>
