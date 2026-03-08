@@ -6,8 +6,8 @@ import {
   Github, Twitter, Linkedin, Mail, Sun, Moon, MessageSquare,
   TrendingUp, Cpu, ShieldCheck, UserPlus, UserCheck, Edit2
 } from "lucide-react";
-import { mockUsers } from "@/mockData/users";
-import { projects } from "@/mockData/projects";
+import { useProjectsStore } from "@/stores/projectsStore";
+import { useSocialStore } from "@/stores/socialStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,19 +27,17 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const { isAuthenticated, user: authUser } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-
-  const user = mockUsers.find(u => u.username === username);
+  const { users, isFollowing, toggleFollow } = useSocialStore();
+  const { projects } = useProjectsStore();
+  const user = users.find(u => u.username === username);
   const userProjects = user ? projects.filter(p => p.authorId === user.id) : [];
-  const starredProjects = projects.slice(0, 3); // mock
+  const starredProjects = projects.slice(0, 3); // Example mock for now
 
   useEffect(() => {
-    if (user) setFollowerCount(user.followers);
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [user]);
+  }, []);
 
   const isOwnProfile = authUser?.username === username;
 
@@ -56,14 +54,14 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   }
 
   const handleFollow = () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !authUser) {
       toast.error("Login Required", { description: "You need to be logged in to follow builders." });
       return;
     }
-    setIsFollowing(!isFollowing);
-    setFollowerCount(p => isFollowing ? p - 1 : p + 1);
-    toast.success(isFollowing ? `Unfollowed @${user.username}` : `Following @${user.username}!`, {
-      description: isFollowing ? "Removed from your network." : "Their artifacts will appear in your feed.",
+    toggleFollow(authUser.id, user.id);
+    const nowFollowing = !isFollowing(user.id);
+    toast.success(nowFollowing ? `Following @${user.username}!` : `Unfollowed @${user.username}`, {
+      description: nowFollowing ? "Their artifacts will appear in your feed." : "Removed from your network.",
     });
   };
 
@@ -105,12 +103,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </Link>
               ) : (
                 <Button
-                  variant={isFollowing ? "secondary" : "primary"}
-                  icon={isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                  variant={isFollowing(user.id) ? "secondary" : "primary"}
+                  icon={isFollowing(user.id) ? <UserCheck size={15} /> : <UserPlus size={15} />}
                   onClick={handleFollow}
                   className="h-11 rounded-full px-7 uppercase text-[10px] font-black tracking-widest hidden sm:flex shadow-lg shadow-primary/10"
                 >
-                  {isFollowing ? "Following" : "Follow"}
+                  {isFollowing(user.id) ? "Following" : "Follow"}
                 </Button>
               )}
             </div>
@@ -169,9 +167,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
                 {/* Mobile follow btn */}
                 {!isOwnProfile && (
-                  <Button variant={isFollowing ? "secondary" : "primary"} fullWidth icon={isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                  <Button variant={isFollowing(user.id) ? "secondary" : "primary"} fullWidth icon={isFollowing(user.id) ? <UserCheck size={15} /> : <UserPlus size={15} />}
                     onClick={handleFollow} className="h-12 rounded-2xl font-black uppercase tracking-widest sm:hidden mb-8">
-                    {isFollowing ? "Following" : "Follow"}
+                    {isFollowing(user.id) ? "Following" : "Follow"}
                   </Button>
                 )}
               </motion.div>
@@ -180,7 +178,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
                 className="grid grid-cols-2 gap-4">
                 {[
-                  { label: "Followers", value: fmt(followerCount) },
+                  { label: "Followers", value: fmt(user.followers) },
                   { label: "Following", value: fmt(user.following) },
                   { label: "Projects", value: String(userProjects.length) },
                   { label: "Stars", value: fmt(user.totalStars) },
