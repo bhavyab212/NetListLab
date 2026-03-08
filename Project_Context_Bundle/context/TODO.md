@@ -14,23 +14,23 @@
 - ✅ Create root folder structure
 
 ## PHASE 1 — Database & Backend Foundation
-- ⬜ Initialize Prisma with PostgreSQL
-- ⬜ Write all Prisma models (Users, UserProfile, Projects,
+- ✅ Initialize Prisma with PostgreSQL
+- ✅ Write all Prisma models (Users, UserProfile, Projects,
      ProjectSections, ProjectMedia, BOMItems, Stars, Follows,
      Comments, Notifications, Forks)
-- ⬜ Run initial migration
-- ⬜ Set up Supabase project (Auth + Storage buckets)
-- ⬜ Configure storage buckets: project-media, avatars, files
-- ⬜ Write Prisma seed script with 5 test users + 10 sample projects
-- ⬜ Set up Express.js server with middleware stack
-- ⬜ Implement Supabase JWT validation middleware
-- ⬜ Implement rate limiting middleware
-- ⬜ Implement file upload middleware (multer + Supabase Storage)
-- ⬜ Write all API routes: /users, /projects, /sections, /media,
+- ✅ Run initial migration
+- ✅ Set up Supabase project (Auth + Storage buckets)
+- ✅ Configure storage buckets: project-media, avatars, files
+- ✅ Write Prisma seed script with 5 test users + 10 sample projects
+- ✅ Set up Express.js server with middleware stack
+- ✅ Implement Supabase JWT validation middleware
+- ✅ Implement rate limiting middleware
+- ✅ Implement file upload middleware (multer + Supabase Storage)
+- ✅ Write all API routes: /users, /projects, /sections, /media,
      /bom, /stars, /follows, /comments, /notifications, /forks
-- ⬜ Write Zod validation schemas for all routes
-- ⬜ Write service layer for all entities
-- ⬜ Test all API endpoints with sample requests
+- ✅ Write Zod validation schemas for all routes
+- ✅ Write service layer for all entities
+- ✅ Test all API endpoints with sample requests
 
 ## PHASE 2 — Design System
 - ⬜ @design-agent: Publish BRAND.md
