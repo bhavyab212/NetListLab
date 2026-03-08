@@ -51,7 +51,7 @@ export async function forkProject(userId: string, originalProjectId: string) {
                 description: b.description,
                 part_number: b.part_number,
                 buy_link: b.buy_link,
-                estimated_price: b.estimated_price,
+                estimated_price: b.estimated_price ? Number(b.estimated_price) : null,
                 currency: b.currency,
             })),
         });
