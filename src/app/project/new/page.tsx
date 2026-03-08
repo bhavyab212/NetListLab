@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import {
     ArrowLeft, ArrowRight, Check, Plus, Trash2, Sun, Moon,
-    Upload, Tag, ShoppingCart, Code, Rocket, FileText
+    Upload, Tag, ShoppingCart, Code, Rocket, FileText,
+    Cpu, Server, Bot, Brain, Box, HardDrive, Wifi, Binary
 } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -28,7 +29,16 @@ const STEPS = [
     { id: 8, label: "Publish", icon: Rocket, desc: "Review and launch" },
 ];
 
-const CATEGORIES = ["Electronics", "Hardware", "Robotics", "Software", "AI/ML"];
+const CATEGORIES = [
+    { name: "Electronics", icon: Cpu },
+    { name: "Hardware", icon: Server },
+    { name: "Robotics", icon: Bot },
+    { name: "Software", icon: Binary },
+    { name: "AI/ML", icon: Brain },
+    { name: "3D Print", icon: Box },
+    { name: "Mechanics", icon: HardDrive },
+    { name: "IoT", icon: Wifi },
+];
 const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
 interface BOMRow { name: string; category: string; qty: number; price: string; supplier: string; link: string; }
@@ -204,8 +214,8 @@ export default function NewProjectPage() {
         }, 800);
     };
 
-    const inputCls = "w-full h-12 px-5 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40";
-    const labelCls = "block text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 mb-3";
+    const inputCls = "w-full h-12 px-5 rounded-2xl bg-card border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm text-foreground placeholder:text-muted-foreground/60";
+    const labelCls = "block text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-3";
 
     return (
         <div className={isDark ? "dark" : ""}>
@@ -238,7 +248,7 @@ export default function NewProjectPage() {
                             {STEPS.map((s, i) => (
                                 <div key={s.id} className="flex items-center flex-1 last:flex-none">
                                     <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => s.id < step && setStep(s.id)}>
-                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border-2 ${s.id < step ? "bg-primary border-primary text-white" : s.id === step ? "bg-primary/10 border-primary text-primary scale-110 shadow-glow-cyan" : "bg-muted/40 border-border text-muted-foreground/40"}`}>
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border-2 ${s.id < step ? "bg-primary border-primary text-white" : s.id === step ? "bg-primary/10 border-primary text-primary scale-110 shadow-glow-cyan" : "bg-card border-border text-muted-foreground/40"}`}>
                                             {s.id < step ? <Check size={20} /> : <s.icon size={18} />}
                                         </div>
                                         <span className={`text-[9px] font-black uppercase tracking-widest hidden sm:block ${s.id === step ? "text-primary" : "text-muted-foreground/40"}`}>{s.label}</span>
@@ -271,9 +281,10 @@ export default function NewProjectPage() {
                                                     <label className={labelCls}>Category *</label>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         {CATEGORIES.map(c => (
-                                                            <button key={c} onClick={() => setCategory(c)}
-                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${category === c ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:border-primary/40"}`}>
-                                                                {c}
+                                                            <button key={c.name} onClick={() => setCategory(c.name)}
+                                                                className={`py-2 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest border transition-all ${category === c.name ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"}`}>
+                                                                <c.icon size={14} className={category === c.name ? "animate-pulse" : ""} />
+                                                                {c.name}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -283,7 +294,7 @@ export default function NewProjectPage() {
                                                     <div className="flex flex-col gap-2">
                                                         {DIFFICULTIES.map(d => (
                                                             <button key={d} onClick={() => setDifficulty(d)}
-                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${difficulty === d ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:border-primary/40"}`}>
+                                                                className={`py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${difficulty === d ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"}`}>
                                                                 {d}
                                                             </button>
                                                         ))}
@@ -293,7 +304,7 @@ export default function NewProjectPage() {
                                             <div>
                                                 <label className={labelCls}>Description *</label>
                                                 <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Describe what you built, why, and what problem it solves…"
-                                                    className="w-full px-5 py-4 rounded-2xl bg-muted/40 border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40 resize-none" />
+                                                    className="w-full px-5 py-4 rounded-2xl bg-card border border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/60 resize-none" />
                                             </div>
                                             <div>
                                                 <label className={labelCls}>Cover Image URL</label>
@@ -339,7 +350,7 @@ export default function NewProjectPage() {
                                             <div>
                                                 <label className={labelCls}>Safety Notice</label>
                                                 <textarea value={safetyNotice} onChange={e => setSafetyNotice(e.target.value)} rows={2} placeholder="e.g. High voltage present. Proceed with caution."
-                                                    className="w-full px-5 py-4 rounded-2xl bg-muted/40 border border-border focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/40 resize-none" />
+                                                    className="w-full px-5 py-4 rounded-2xl bg-card border border-border focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all outline-none font-medium text-sm placeholder:text-muted-foreground/60 resize-none" />
                                             </div>
                                             {/* Prerequisites */}
                                             <div>
@@ -397,7 +408,7 @@ export default function NewProjectPage() {
                                                     {designDecisions.map((d, i) => (
                                                         <div key={i} className="p-4 rounded-xl bg-muted/20 border border-border relative group">
                                                             <button onClick={() => setDesignDecisions(designDecisions.filter((_, idx) => idx !== i))} className="absolute top-3 right-3 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
-                                                            <input value={d.q} onChange={e => setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, q: e.target.value } : x))} placeholder="Question (e.g. Why use this MCU?)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/40" />
+                                                            <input value={d.q} onChange={e => setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, q: e.target.value } : x))} placeholder="Question (e.g. Why use this MCU?)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/60" />
                                                             <textarea value={d.a} onChange={e => setDesignDecisions(designDecisions.map((x, idx) => idx === i ? { ...x, a: e.target.value } : x))} rows={2} placeholder="Rationale..." className="w-full bg-transparent outline-none text-sm text-foreground/80 resize-none placeholder:text-muted-foreground/30" />
                                                         </div>
                                                     ))}
@@ -429,11 +440,11 @@ export default function NewProjectPage() {
                                         </div>
                                         <div className="space-y-6">
                                             {buildSteps.map((s, i) => (
-                                                <div key={i} className="bg-card/60 border border-border rounded-[24px] p-7 relative group flex flex-col gap-4">
+                                                <div key={i} className="bg-card/60 backdrop-blur-3xl border border-border rounded-[24px] p-7 relative group flex flex-col gap-4">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-lg shrink-0">{i + 1}</div>
                                                         <input value={s.title} onChange={e => updateStep(i, "title", e.target.value)} placeholder={`Step ${i + 1} title…`}
-                                                            className="flex-1 bg-transparent outline-none font-black text-foreground text-lg placeholder:text-muted-foreground/40" />
+                                                            className="flex-1 bg-transparent outline-none font-black text-foreground text-lg placeholder:text-muted-foreground/60" />
                                                         {buildSteps.length > 1 && (
                                                             <button onClick={() => removeStep(i)} className="opacity-0 group-hover:opacity-100 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 transition-all">
                                                                 <Trash2 size={14} />
@@ -463,7 +474,7 @@ export default function NewProjectPage() {
                                             <h2 className="text-4xl font-black font-display mb-3">Bill of Materials</h2>
                                             <p className="text-muted-foreground font-medium">List every component so others can replicate your build.</p>
                                         </div>
-                                        <div className="bg-card/60 border border-border rounded-[28px] overflow-hidden">
+                                        <div className="bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] overflow-hidden">
                                             <table className="w-full text-left">
                                                 <thead>
                                                     <tr className="border-b border-border bg-muted/20">
@@ -514,7 +525,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Diagrams */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Diagrams</h3>
                                                 <button onClick={() => setSchematics([...schematics, { name: "", tag: "logic", tool: "", layers: "", desc: "", img: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Diagram</button>
@@ -545,7 +556,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Stackup */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">PCB Stackup & Layers</h3>
                                                 <button onClick={() => setPcbLayers([...pcbLayers, { num: "", color: "#22c55e", type: "", weight: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Layer</button>
@@ -562,7 +573,7 @@ export default function NewProjectPage() {
                                                 {pcbLayers.map((l, i) => (
                                                     <div key={i} className="flex gap-2 items-center">
                                                         <input value={l.num} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, num: e.target.value } : x))} placeholder="Name (F.Cu)" className={`${inputCls} flex-1`} />
-                                                        <input type="color" value={l.color} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, color: e.target.value } : x))} className="w-12 h-12 rounded-xl p-1 bg-muted/40 border border-border cursor-pointer appearance-none shrink-0" />
+                                                        <input type="color" value={l.color} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, color: e.target.value } : x))} className="w-12 h-12 rounded-xl p-1 bg-card border border-border cursor-pointer appearance-none shrink-0" />
                                                         <input value={l.type} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))} placeholder="Type (Signal)" className={`${inputCls} flex-[2]`} />
                                                         <input value={l.weight} onChange={e => setPcbLayers(pcbLayers.map((x, idx) => idx === i ? { ...x, weight: e.target.value } : x))} placeholder="Weight" className={`${inputCls} w-24`} />
                                                         <button onClick={() => setPcbLayers(pcbLayers.filter((_, idx) => idx !== i))} className="p-3 text-muted-foreground hover:text-rose-500"><Trash2 size={16} /></button>
@@ -572,7 +583,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Rules */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Design Rules</h3>
                                                 <button onClick={() => setDesignRules([...designRules, { rule: "", value: "", status: "pass" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Rule</button>
@@ -607,7 +618,7 @@ export default function NewProjectPage() {
                                             <div className="flex gap-2 mb-6">
                                                 {["cpp", "python", "verilog", "javascript", "c"].map(l => (
                                                     <button key={l} onClick={() => updateCodeFile(activeFileId, "language", l)}
-                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeFile.language === l ? "bg-primary/10 border-primary text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-foreground"}`}>
+                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeFile.language === l ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"}`}>
                                                         {l}
                                                     </button>
                                                 ))}
@@ -639,7 +650,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Environment Setup */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px] mt-8">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Environment Setup</h3>
                                                 <button onClick={() => setEnvSetup([...envSetup, { title: "", items: [] }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Group</button>
@@ -648,7 +659,7 @@ export default function NewProjectPage() {
                                                 {envSetup.map((env, i) => (
                                                     <div key={i} className="p-4 rounded-xl bg-muted/20 border border-border relative group">
                                                         <button onClick={() => setEnvSetup(envSetup.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
-                                                        <input value={env.title} onChange={e => setEnvSetup(envSetup.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Group Title (e.g. Compiler)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/40" />
+                                                        <input value={env.title} onChange={e => setEnvSetup(envSetup.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} placeholder="Group Title (e.g. Compiler)" className="w-full bg-transparent outline-none font-bold text-sm mb-2 placeholder:text-muted-foreground/60" />
                                                         <input value={env.items.join(", ")} onChange={e => setEnvSetup(envSetup.map((x, idx) => idx === i ? { ...x, items: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } : x))} placeholder="Items (comma separated)" className="w-full bg-transparent outline-none text-sm text-foreground/80 placeholder:text-muted-foreground/30" />
                                                     </div>
                                                 ))}
@@ -656,7 +667,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Dependencies */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px] mt-8">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Dependencies</h3>
                                                 <button onClick={() => setDependencies([...dependencies, { name: "", ver: "", license: "", desc: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Dependency</button>
@@ -675,7 +686,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Build Instructions */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px] mt-8">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Build Instructions</h3>
                                                 <button onClick={() => setBuildInstructions([...buildInstructions, { step: "", cmd: "", note: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Command</button>
@@ -684,7 +695,7 @@ export default function NewProjectPage() {
                                                 {buildInstructions.map((b, i) => (
                                                     <div key={i} className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-muted/10 relative group">
                                                         <button onClick={() => setBuildInstructions(buildInstructions.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"><Trash2 size={14} /></button>
-                                                        <input value={b.step} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, step: e.target.value } : x))} placeholder="Step Name (e.g. Install dependencies)" className="w-1/2 bg-transparent outline-none font-bold text-sm mb-1 placeholder:text-muted-foreground/40" />
+                                                        <input value={b.step} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, step: e.target.value } : x))} placeholder="Step Name (e.g. Install dependencies)" className="w-1/2 bg-transparent outline-none font-bold text-sm mb-1 placeholder:text-muted-foreground/60" />
                                                         <input value={b.cmd} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, cmd: e.target.value } : x))} placeholder="Command (e.g. npm run build)" className="w-full font-mono text-sm text-emerald-400 bg-black/20 p-2 rounded-lg outline-none placeholder:text-emerald-400/20" />
                                                         <input value={b.note} onChange={e => setBuildInstructions(buildInstructions.map((x, idx) => idx === i ? { ...x, note: e.target.value } : x))} placeholder="Note (e.g. Takes about 2 minutes)" className="w-full bg-transparent outline-none text-sm text-muted-foreground placeholder:text-muted-foreground/30 mt-1" />
                                                     </div>
@@ -693,7 +704,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Test Suite */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px] mt-8">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px] mt-8">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Test Results & Coverage</h3>
                                                 <button onClick={() => setTestSuite([...testSuite, { name: "", file: "", status: "pass", ms: "", desc: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Test</button>
@@ -727,7 +738,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Gallery */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <label className={labelCls}>Photo Gallery URLs</label>
                                             <div className="grid grid-cols-3 gap-3 mb-4">
                                                 {galleryImages.map((img, i) => (
@@ -744,7 +755,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Videos */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Videos (YouTube, Vimeo, etc)</h3>
                                                 <button onClick={() => setVideos([...videos, { title: "", url: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Video</button>
@@ -763,7 +774,7 @@ export default function NewProjectPage() {
 
 
                                         {/* Simulations */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Interactive Simulations</h3>
                                                 <button onClick={() => setSimulations([...simulations, { title: "", desc: "", url: "", icon: "🔬", badge: "Sim" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Sim</button>
@@ -784,7 +795,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Build Logs */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Build Logs & Updates</h3>
                                                 <button onClick={() => setBuildLogs([...buildLogs, { date: new Date().toISOString().split("T")[0], title: "", body: "", tag: "Update", images: [] }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add Log</button>
@@ -806,7 +817,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Downloads */}
-                                        <div className="bg-card/60 p-6 border border-border rounded-[28px]">
+                                        <div className="bg-card/60 backdrop-blur-3xl p-6 border border-border rounded-[28px]">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-display">Downloadable Files</h3>
                                                 <button onClick={() => setDownloads([...downloads, { name: "", size: "", fmt: "", url: "" }])} className="text-[10px] font-black tracking-widest uppercase text-primary flex items-center gap-1 hover:brightness-125"><Plus size={12} /> Add File</button>
@@ -836,7 +847,7 @@ export default function NewProjectPage() {
                                         </div>
 
                                         {/* Summary Card */}
-                                        <div className="bg-card/60 border border-border rounded-[28px] overflow-hidden">
+                                        <div className="bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] overflow-hidden">
                                             {coverUrl && <img src={coverUrl} alt="cover" className="w-full h-48 object-cover" />}
                                             <div className="p-8">
                                                 <div className="flex gap-3 mb-4">
