@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  Search, Bolt, Cpu, Bot as SmartToy, Brain, Terminal,
+  Search, Cpu, Bot, Brain, Server, Binary,
   ChevronDown, Filter, Star, MessageSquare, Bell, Plus,
   ArrowRight, GitFork, Download, Share2, ExternalLink,
   Flame, LayoutGrid, History, Menu, X, Sun, Moon,
-  ArrowUpDown, TrendingUp, Clock, Zap, Bookmark, ArrowLeft
+  ArrowUpDown, TrendingUp, Clock, Zap, Bookmark, ArrowLeft,
+  Box, HardDrive, Wifi
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { type Project } from "@/mockData/projects";
@@ -151,7 +152,7 @@ const CategoryPill = ({ label, icon: Icon, active, onClick }: { label: string; i
     className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full transition-all duration-300 border font-black text-[10px] uppercase tracking-[0.2em] whitespace-nowrap
       ${active ? "bg-primary/10 border-primary text-primary shadow-glow-cyan scale-105" : "bg-muted/50 border-border text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5"}`}
   >
-    <Icon size={13} className={active ? "animate-pulse" : ""} />
+    <Icon size={16} strokeWidth={2.5} className={active ? "animate-pulse" : ""} />
     {label}
   </button>
 );
@@ -252,10 +253,13 @@ export default function ExplorePage() {
   const categories = [
     { name: "All", icon: LayoutGrid },
     { name: "Electronics", icon: Cpu },
-    { name: "Hardware", icon: Bolt },
-    { name: "Robotics", icon: SmartToy },
-    { name: "Software", icon: Terminal },
+    { name: "Hardware", icon: Server },
+    { name: "Robotics", icon: Bot },
+    { name: "Software", icon: Binary },
     { name: "AI/ML", icon: Brain },
+    { name: "3D Print", icon: Box },
+    { name: "Mechanics", icon: HardDrive },
+    { name: "IoT", icon: Wifi },
   ];
 
   const sortOptions = [
