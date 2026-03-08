@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { type User } from '../mockData/users';
 import { mockLogin, mockRegister, type LoginCredentials, type RegisterData } from '../mockData/auth';
 
@@ -14,50 +15,57 @@ interface AuthState {
     updateProfile: (updates: Partial<User>) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-    user: null,
-    isAuthenticated: false,
-    isLoading: false,
-    error: null,
+export const useAuthStore = create<AuthState>()(
+    persist(
+        (set, get) => ({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
 
-    login: async (credentials) => {
-        set({ isLoading: true, error: null });
-        const result = await mockLogin(credentials);
+            login: async (credentials) => {
+                set({ isLoading: true, error: null });
+                const result = await mockLogin(credentials);
 
-        if (result.success && result.user) {
-            set({ user: result.user, isAuthenticated: true, isLoading: false });
-            return true;
-        } else {
-            set({ error: result.error || 'Login failed', isLoading: false });
-            return false;
+                if (result.success && result.user) {
+                    set({ user: result.user, isAuthenticated: true, isLoading: false });
+                    return true;
+                } else {
+                    set({ error: result.error || 'Login failed', isLoading: false });
+                    return false;
+                }
+            },
+
+            register: async (data) => {
+                set({ isLoading: true, error: null });
+                const result = await mockRegister(data);
+
+                if (result.success && result.user) {
+                    set({ user: result.user, isAuthenticated: true, isLoading: false });
+                    return true;
+                } else {
+                    set({ error: result.error || 'Registration failed', isLoading: false });
+                    return false;
+                }
+            },
+
+            logout: () => {
+                set({ user: null, isAuthenticated: false, error: null });
+            },
+
+            clearError: () => {
+                set({ error: null });
+            },
+
+            updateProfile: (updates) => {
+                const { user } = get();
+                if (user) {
+                    set({ user: { ...user, ...updates } });
+                }
+            },
+        }),
+        {
+            name: 'netlistlab-auth',
         }
-    },
-
-    register: async (data) => {
-        set({ isLoading: true, error: null });
-        const result = await mockRegister(data);
-
-        if (result.success && result.user) {
-            set({ user: result.user, isAuthenticated: true, isLoading: false });
-            return true;
-        } else {
-            set({ error: result.error || 'Registration failed', isLoading: false });
-            return false;
-        }
-    },
-
-    logout: () => {
-        set({ user: null, isAuthenticated: false, error: null });
-    },
-
-    clearError: () => {
-        set({ error: null });
-    },
-
-    updateProfile: (updates) => {
-        const { user } = get();
-        if (user) {
-            set({ user: { ...user, ...updates } });
-        }
-    },
-}));
+    )
+);

@@ -234,6 +234,7 @@ export default function ExplorePage() {
   const { isAuthenticated, logout, user: authUser } = useAuthStore();
   const { projects } = useProjectsStore();
   const { unreadCount: unreadNotifs } = useNotificationStore();
+  const router = useRouter();
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
