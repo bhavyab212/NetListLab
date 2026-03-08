@@ -16,6 +16,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useProjectsStore } from "@/stores/projectsStore";
 import { useContributionStore } from "@/stores/contributionStore";
+import { useSocialStore } from "@/stores/socialStore";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -41,6 +42,8 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
     return d === 0 ? "Today" : d === 1 ? "Yesterday" : `${d}d ago`;
   };
 
+  const { addReply, toggleCommentUpvote } = useSocialStore();
+
   const handleReplySubmit = () => {
     if (!isAuthenticated) {
       toast.error("Login Required", { description: "You need to be logged in to reply." });
@@ -48,17 +51,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
     }
     if (!replyBody.trim()) return;
 
-    const newReply = {
-      id: `r-new-${Date.now()}`,
-      authorId: authUser?.id ?? "guest",
-      author: authUser?.username ?? "guest",
-      avatar: authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest",
-      body: replyBody,
-      createdAt: new Date().toISOString(),
-      upvotes: 0
-    };
-
-    setLocalReplies(prev => [...prev, newReply]);
+    addReply(comment.id, authUser?.id ?? "guest", authUser?.username ?? "guest", authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest", replyBody);
     setReplyBody("");
     setIsReplying(false);
     setShowReplies(true);
@@ -80,9 +73,9 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
           <p className="text-sm text-muted-foreground font-medium leading-relaxed">{comment.body}</p>
         </div>
         <div className="flex items-center gap-6 mt-3 ml-3">
-          <button onClick={() => { setUpvoted(!upvoted); setUpvotes(p => upvoted ? p - 1 : p + 1); }}
+          <button onClick={() => { if (!upvoted) { setUpvoted(true); toggleCommentUpvote(comment.id, authUser?.id ?? "guest"); } }}
             className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${upvoted ? "text-primary scale-105" : "text-muted-foreground/50 hover:text-primary"}`}>
-            <ThumbsUp size={13} className={upvoted ? "fill-primary" : ""} /> {upvotes}
+            <ThumbsUp size={13} className={upvoted ? "fill-primary" : ""} /> {comment.upvotes}
           </button>
 
           <button onClick={() => setIsReplying(!isReplying)}
@@ -90,11 +83,11 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
             <MessageSquare size={13} /> Reply
           </button>
 
-          {localReplies.length > 0 && (
+          {comment.replies.length > 0 && (
             <button onClick={() => setShowReplies(!showReplies)}
               className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 hover:text-primary transition-all">
               <ChevronDown size={12} className={`transition-transform ${showReplies ? "rotate-180" : ""}`} />
-              {localReplies.length} {showReplies ? "Hide" : "Replies"}
+              {comment.replies.length} {showReplies ? "Hide" : "Replies"}
             </button>
           )}
         </div>
@@ -118,10 +111,10 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
               </div>
             </motion.div>
           )}
-          {showReplies && localReplies.length > 0 && (
+          {showReplies && comment.replies.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
               className="mt-5 pl-5 border-l-2 border-primary/20 flex flex-col gap-5 overflow-hidden">
-              {localReplies.map(r => (
+              {comment.replies.map(r => (
                 <div key={r.id} className="flex gap-4">
                   <Link href={`/user/${r.author}`} className="shrink-0">
                     <img src={r.avatar} alt={r.author} className="w-8 h-8 rounded-full border-2 border-border hover:border-primary transition-all" />
@@ -838,13 +831,16 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const { isAuthenticated, user: authUser } = useAuthStore();
   const { forkProject, projects, getUpstreamChanges, syncWithUpstream, getForkNetwork } = useProjectsStore();
   const { getProposalsForProject, createProposal } = useContributionStore();
+  const { getProjectComments, addComment, isFollowing, toggleFollow } = useSocialStore();
+
   const project = projects.find(p => p.id === parseInt(id));
   const [activeTab, setActiveTab] = useState("overview");
   const [isStarred, setIsStarred] = useState(false);
   const [starCount, setStarCount] = useState(project?.stars ?? 0);
   const [scrolled, setScrolled] = useState(false);
   const [commentBody, setCommentBody] = useState("");
-  const [comments, setComments] = useState(() => project ? getCommentsByProjectId(project.id) : []);
+
+  const comments = project ? getProjectComments(project.id) : [];
   const bom = project ? getBOMByProjectId(project.id) : [];
 
   // Tab-specific state variables moved to top level to comply with React Rules of Hooks
@@ -941,18 +937,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
       return;
     }
     if (!commentBody.trim()) return;
-    const newComment = {
-      id: `c-new-${Date.now()}`,
-      projectId: project.id,
-      authorId: authUser?.id ?? "user-1",
-      author: authUser?.username ?? "bhavya_dev",
-      avatar: authUser?.avatar ?? "https://i.pravatar.cc/100?u=user1",
-      body: commentBody.trim(),
-      upvotes: 0,
-      createdAt: new Date().toISOString(),
-      replies: [],
-    };
-    setComments(prev => [newComment, ...prev]);
+    addComment(project.id, authUser!.id, authUser!.username, authUser!.avatar, commentBody.trim());
     setCommentBody("");
     toast.success("Comment Posted", { description: "Your transmission has been added." });
   };
@@ -1016,16 +1001,32 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
               </motion.div>
 
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col justify-center">
-                <Link href={`/user/${project.author}`} className="inline-flex items-center gap-3 mb-8 p-3 pr-5 rounded-2xl bg-muted/30 border border-border w-fit hover:border-primary/50 transition-all group">
-                  <div className="relative">
-                    <img src={project.authorAvatar} className="w-11 h-11 rounded-full border-2 border-border group-hover:border-primary transition-all" alt={project.author} />
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-foreground">@{project.author}</h4>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Core Contributor</p>
-                  </div>
-                </Link>
+                <div className="flex items-center gap-4 mb-8">
+                  <Link href={`/user/${project.author}`} className="inline-flex items-center gap-3 p-3 pr-5 rounded-2xl bg-muted/30 border border-border hover:border-primary/50 transition-all group">
+                    <div className="relative">
+                      <img src={project.authorAvatar} className="w-11 h-11 rounded-full border-2 border-border group-hover:border-primary transition-all" alt={project.author} />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-foreground">@{project.author}</h4>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Core Contributor</p>
+                    </div>
+                  </Link>
+
+                  {/* Follow Button */}
+                  {authUser?.id !== project.authorId && (
+                    <button
+                      onClick={() => {
+                        if (!isAuthenticated || !authUser) return toast.error("Login Required");
+                        toggleFollow(authUser.id, project.authorId);
+                        toast.success(isFollowing(project.authorId) ? "Unfollowed" : "Following", { description: `Updates will appear in your feed.` });
+                      }}
+                      className={`h-11 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${isFollowing(project.authorId) ? "bg-primary/10 border-primary/30 text-primary" : "bg-card border-border hover:border-primary/50 text-foreground"}`}
+                    >
+                      {isFollowing(project.authorId) ? "Following" : "Follow"}
+                    </button>
+                  )}
+                </div>
 
                 {project.forkedFrom && (
                   <div className="mb-4 inline-flex items-center gap-2 p-2 pr-4 bg-muted/40 border border-border rounded-xl">
