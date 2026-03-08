@@ -1,96 +1,73 @@
-import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import express from 'express'
+import cors from 'cors'
+import helmet from 'helmet'
+import dotenv from 'dotenv'
 
-// Load env vars first
-dotenv.config();
+dotenv.config()
 
-// Route imports (will be filled in as each route file is created)
-import authRoutes from './routes/auth';
-import userRoutes from './routes/users';
-import projectRoutes from './routes/projects';
-import sectionRoutes from './routes/sections';
-import bomRoutes from './routes/bom';
-import starRoutes from './routes/stars';
-import followRoutes from './routes/follows';
-import commentRoutes from './routes/comments';
-import notificationRoutes from './routes/notifications';
-import forkRoutes from './routes/forks';
-import uploadRoutes from './routes/upload';
+const app = express()
+const PORT = process.env.PORT || 3001
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+// Middleware
+app.use(helmet())
+app.use(cors({
+    origin: process.env.FRONTEND_URL || '*',
+    credentials: true
+}))
+app.use(express.json({ limit: '10mb' }))
 
-// ─── Middleware Stack (order is important) ───────────────────────────────────
-
-// 1. Security headers (must be first)
-app.use(helmet());
-
-// 2. CORS — allow only our frontend origin
-app.use(
-    cors({
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        credentials: true,
-        methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+// Health routes (no auth, no prefix)
+app.get('/', (_req, res) => {
+    res.status(200).json({
+        message: 'NetListLab API is running',
+        version: '1.0.0'
     })
-);
+})
 
-// 3. Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok' })
+})
 
-// 4. Rate limiting — 100 requests per minute per IP
-app.use(
-    rateLimit({
-        windowMs: 60 * 1000, // 1 minute
-        max: 100,
-        standardHeaders: true,
-        legacyHeaders: false,
-        message: { error: 'Too many requests, please try again later.' },
-    })
-);
+// API Routes
+import userRoutes from './routes/users'
+import authRoutes from './routes/auth'
+import projectRoutes from './routes/projects'
+import sectionRoutes from './routes/sections'
+import bomRoutes from './routes/bom'
+import starRoutes from './routes/stars'
+import followRoutes from './routes/follows'
+import commentRoutes from './routes/comments'
+import notificationRoutes from './routes/notifications'
+import forkRoutes from './routes/forks'
+import uploadRoutes from './routes/upload'
 
-// ─── Health Check ────────────────────────────────────────────────────────────
-app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+app.use('/api/users', userRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api/projects', projectRoutes)
+app.use('/api/sections', sectionRoutes)
+app.use('/api/bom', bomRoutes)
+app.use('/api/stars', starRoutes)
+app.use('/api/follows', followRoutes)
+app.use('/api/comments', commentRoutes)
+app.use('/api/notifications', notificationRoutes)
+app.use('/api/forks', forkRoutes)
+app.use('/api/upload', uploadRoutes)
 
-// ─── API Routes ──────────────────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/sections', sectionRoutes);
-app.use('/api/projects', bomRoutes);       // /api/projects/:id/bom
-app.use('/api/bom', bomRoutes);            // /api/bom/:itemId
-app.use('/api/projects', starRoutes);      // /api/projects/:id/star
-app.use('/api/users', followRoutes);       // /api/users/:username/follow
-app.use('/api/projects', commentRoutes);   // /api/projects/:id/comments
-app.use('/api/comments', commentRoutes);   // /api/comments/:commentId
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/projects', forkRoutes);      // /api/projects/:id/fork
-app.use('/api/upload', uploadRoutes);
+// 404 handler — MUST be last
+app.use((_req, res) => {
+    res.status(404).json({ error: 'Route not found' })
+})
 
-// ─── 404 Handler ─────────────────────────────────────────────────────────────
-app.use((_req: Request, res: Response) => {
-    res.status(404).json({ error: 'Route not found' });
-});
-
-// ─── Global Error Handler ────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    console.error('[Error]', err);
+// Global error handler — MUST be after 404
+app.use((err: any, _req: any, res: any, _next: any) => {
+    console.error(err.stack)
     res.status(err.status || 500).json({
-        error: err.message || 'Internal server error',
-    });
-});
+        error: err.message || 'Internal server error'
+    })
+})
 
-// ─── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`\n🔌 NetListLab API running on port ${PORT}`);
-    console.log(`   Health check: http://localhost:${PORT}/health\n`);
-});
+    console.log(`NetListLab API running on port ${PORT}`)
+})
 
-export default app;
+export default app
