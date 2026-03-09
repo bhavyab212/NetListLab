@@ -17,6 +17,7 @@ import CircuitBackground from '@/components/ui/CircuitBackground';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import LiquidCursor from '@/components/ui/LiquidCursor';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 const ROLES = ['Student', 'Engineer', 'Researcher', 'Freelancer', 'Other'];
 
@@ -69,20 +70,57 @@ export default function OnboardingPage() {
         }
     }, [step, goNext, router]);
 
-    const handleFinish = useCallback(() => {
-        updateProfile({
-            bio,
-            role: (role.toLowerCase() as any) || 'other',
-            domains: selectedDomains.map((id: string) => {
+    const handleFinish = useCallback(async () => {
+        const tid = toast.loading('Saving your profile…');
+        try {
+            // Build domain names from IDs
+            const domainNames = selectedDomains.map((id: string) => {
                 const d = domains.find(dom => dom.id === id);
                 return d?.name || id;
-            }),
-            skills: selectedSkills,
-            institution,
-        });
-        toast.success('Welcome to NetListLab! 🚀', { description: 'Profile setup complete.' });
+            });
+
+            // If avatar is a data URL (uploaded file), upload it first
+            let avatarUrl: string | undefined = avatar ?? undefined;
+            if (avatar && avatar.startsWith('data:')) {
+                try {
+                    const blob = await fetch(avatar).then(r => r.blob());
+                    const formData = new FormData();
+                    formData.append('file', blob, 'avatar.jpg');
+                    const result = await api.uploadAvatar(formData);
+                    avatarUrl = result.url;
+                } catch {
+                    // Fallback: skip avatar upload, continue with profile save
+                    avatarUrl = undefined;
+                }
+            }
+
+            const updated = await api.updateMe({
+                bio,
+                current_role: role.toLowerCase() || 'other',
+                field_of_work: domainNames,
+                skill_tags: selectedSkills,
+                institution,
+                ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            });
+
+            updateProfile(updated as Parameters<typeof updateProfile>[0]);
+            toast.success('Welcome to NetListLab! 🚀', { id: tid, description: 'Profile setup complete.' });
+        } catch {
+            // Even if API fails, save locally and redirect
+            updateProfile({
+                bio,
+                role: (role.toLowerCase() as any) || 'other',
+                domains: selectedDomains.map((id: string) => {
+                    const d = domains.find(dom => dom.id === id);
+                    return d?.name || id;
+                }),
+                skills: selectedSkills,
+                institution,
+            });
+            toast.success('Welcome to NetListLab! 🚀', { id: tid, description: 'Profile setup complete.' });
+        }
         router.push('/explore');
-    }, [bio, role, selectedDomains, selectedSkills, institution, updateProfile, router]);
+    }, [bio, role, selectedDomains, selectedSkills, institution, avatar, updateProfile, router]);
 
     const handleAvatarUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -278,7 +316,7 @@ function Step1({ avatar, bio, role, onAvatarUpload, onAvatarSelect, onBioChange,
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <label className="group relative" style={{ width: '80px', height: '80px', borderRadius: '16px', background: 'var(--bg-base)', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', flexShrink: 0, transition: 'all 0.2s ease' }}>
                             {avatar && !presetAvatars.includes(avatar) ? (
-                                <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img loading="lazy" src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}>
                                     <Upload size={20} className="group-hover:text-primary transition-colors" />
@@ -307,7 +345,7 @@ function Step1({ avatar, bio, role, onAvatarUpload, onAvatarSelect, onBioChange,
                                     }}
                                     className="hover:scale-105 hover:border-primary/50"
                                 >
-                                    <img src={url} alt={`Preset ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img loading="lazy" src={url} alt={`Preset ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 </button>
                             ))}
                         </div>
