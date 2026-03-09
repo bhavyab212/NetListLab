@@ -115,7 +115,7 @@ export default function ProfileSettingsPage() {
                             <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-7">Profile Photo</h2>
                             <div className="flex items-center gap-8">
                                 <div className="relative group cursor-pointer">
-                                    <img src={avatar || `https://i.pravatar.cc/120?u=${username}`} alt="avatar" className="w-24 h-24 rounded-[24px] object-cover border-4 border-border group-hover:border-primary transition-all" />
+                                    <img loading="lazy" src={avatar || `https://i.pravatar.cc/120?u=${username}`} alt="avatar" className="w-24 h-24 rounded-[24px] object-cover border-4 border-border group-hover:border-primary transition-all" />
                                     <div className="absolute inset-0 flex items-center justify-center rounded-[24px] bg-black/50 opacity-0 group-hover:opacity-100 transition-all">
                                         <Camera size={24} className="text-white" />
                                     </div>
