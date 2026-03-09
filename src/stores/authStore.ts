@@ -5,6 +5,15 @@ import { api } from '@/lib/api'
 import type { ApiUser } from '@/lib/api-types'
 import { toast } from 'sonner'
 
+export type AuthStatus =
+    | 'idle'
+    | 'loading'
+    | 'authenticated'
+    | 'unauthenticated'
+    | 'email_not_confirmed'
+    | 'session_expired'
+    | 'profile_incomplete'
+
 interface AuthState {
     // The raw Supabase-synced user profile
     user: ApiUser | null
@@ -13,10 +22,11 @@ interface AuthState {
     isAuthenticated: boolean
     isLoading: boolean
     error: string | null
+    authStatus: AuthStatus
 
     // Actions
-    login: (credentials: { email: string; password: string }) => Promise<boolean>
-    register: (data: { email: string; password: string; username: string; fullName: string }) => Promise<boolean>
+    login: (credentials: { email: string; password: string }) => Promise<true | false | 'email_not_confirmed'>
+    register: (data: { email: string; password: string; username: string; fullName: string }) => Promise<true | false | 'confirm_email'>
     logout: () => Promise<void>
     checkAuth: () => Promise<void>
     updateProfile: (updates: Partial<ApiUser>) => void
@@ -31,21 +41,57 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             error: null,
+            authStatus: 'idle',
 
             // ── Login ─────────────────────────────────────────────────────────────
             login: async ({ email, password }) => {
                 set({ isLoading: true, error: null })
                 try {
                     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-                    if (error) throw new Error(error.message)
+
+                    // Detect "Email not confirmed" BEFORE treating as a general error
+                    if (error) {
+                        if (error.message.toLowerCase().includes('email not confirmed')) {
+                            set({ isLoading: false, authStatus: 'email_not_confirmed' })
+                            return 'email_not_confirmed'
+                        }
+                        throw new Error(error.message)
+                    }
                     if (!data.session) throw new Error('No session returned')
 
-                    const profile = await api.getMe()
-                    set({ user: profile, profile, isAuthenticated: true, isLoading: false, error: null })
+                    // Try to get backend profile — never fail the whole login because of this
+                    let profile: ApiUser | null = null
+                    try {
+                        profile = await api.getMe()
+                    } catch {
+                        // Backend has no profile yet — try to sync the user record
+                        try {
+                            const sbUser = data.user
+                            await api.syncUser({
+                                id: sbUser.id,
+                                email: sbUser.email ?? email,
+                                username: (sbUser.email ?? email).split('@')[0],
+                                full_name: sbUser.user_metadata?.full_name ?? '',
+                            })
+                            // Retry getMe after sync
+                            profile = await api.getMe().catch(() => null)
+                        } catch {
+                            // Sync also failed — fine, continue with null profile
+                        }
+                    }
+
+                    set({
+                        user: profile,
+                        profile,
+                        isAuthenticated: true,
+                        isLoading: false,
+                        error: null,
+                        authStatus: profile ? 'authenticated' : 'profile_incomplete',
+                    })
                     return true
                 } catch (err) {
                     const message = err instanceof Error ? err.message : 'Login failed'
-                    set({ error: message, isLoading: false })
+                    set({ error: message, isLoading: false, authStatus: 'unauthenticated' })
                     return false
                 }
             },
@@ -54,32 +100,37 @@ export const useAuthStore = create<AuthState>()(
             register: async ({ email, password, username, fullName }) => {
                 set({ isLoading: true, error: null })
                 try {
-                    // 1. Create Supabase auth user
                     const { data, error } = await supabase.auth.signUp({ email, password })
                     if (error) throw new Error(error.message)
                     const supabaseUser = data.user
                     if (!supabaseUser) throw new Error('Registration failed — no user returned')
 
-                    // 2. Sync user record with our DB via /api/auth/sync (master prompt spec)
-                    let profile: ApiUser
-                    try {
-                        profile = await api.syncUser({
-                            id: supabaseUser.id,
-                            email,
-                            username,
-                            full_name: fullName,
-                        })
-                    } catch {
-                        // Fallback: try /api/auth/register if sync endpoint not available yet
-                        profile = await api.registerUser({
-                            id: supabaseUser.id,
-                            email,
-                            username,
-                            full_name: fullName,
-                        })
+                    // Email confirmation required (session is null when email confirm is ON)
+                    if (!data.session) {
+                        set({ isLoading: false, authStatus: 'email_not_confirmed' })
+                        return 'confirm_email'
                     }
 
-                    set({ user: profile, profile, isAuthenticated: true, isLoading: false, error: null })
+                    // Session exists (email confirmation OFF) — sync user to backend now
+                    let profile: ApiUser | null = null
+                    try {
+                        profile = await api.syncUser({ id: supabaseUser.id, email, username, full_name: fullName })
+                    } catch {
+                        try {
+                            profile = await api.registerUser({ id: supabaseUser.id, email, username, full_name: fullName })
+                        } catch {
+                            // Ignore — profile will sync on next login
+                        }
+                    }
+
+                    set({
+                        user: profile,
+                        profile,
+                        isAuthenticated: true,
+                        isLoading: false,
+                        error: null,
+                        authStatus: 'authenticated',
+                    })
                     return true
                 } catch (err) {
                     const message = err instanceof Error ? err.message : 'Registration failed'
@@ -91,28 +142,40 @@ export const useAuthStore = create<AuthState>()(
             // ── Logout ────────────────────────────────────────────────────────────
             logout: async () => {
                 await supabase.auth.signOut()
-                set({ user: null, profile: null, isAuthenticated: false, error: null })
+                set({ user: null, profile: null, isAuthenticated: false, error: null, authStatus: 'unauthenticated' })
                 toast.success('Logged out', { description: 'See you next time.' })
             },
 
             // ── Check / restore auth on app mount ────────────────────────────────
             checkAuth: async () => {
+                set({ authStatus: 'loading' })
                 try {
                     const { data: { session } } = await supabase.auth.getSession()
                     if (!session) {
-                        set({ user: null, profile: null, isAuthenticated: false })
+                        set({ user: null, profile: null, isAuthenticated: false, authStatus: 'unauthenticated' })
                         return
                     }
-                    // Only fetch if we don't already have the profile
+
+                    // Email not yet confirmed
+                    if (!session.user.email_confirmed_at) {
+                        set({ user: null, profile: null, isAuthenticated: false, authStatus: 'email_not_confirmed' })
+                        return
+                    }
+
+                    // Try to get/restore backend profile
                     if (!get().user) {
-                        const profile = await api.getMe()
-                        set({ user: profile, profile, isAuthenticated: true })
+                        try {
+                            const profile = await api.getMe()
+                            set({ user: profile, profile, isAuthenticated: true, authStatus: 'authenticated' })
+                        } catch {
+                            // Session valid but no backend profile — mark incomplete, still auth'd
+                            set({ isAuthenticated: true, authStatus: 'profile_incomplete' })
+                        }
                     } else {
-                        set({ isAuthenticated: true })
+                        set({ isAuthenticated: true, authStatus: 'authenticated' })
                     }
                 } catch {
-                    // Session exists but profile fetch failed — clear state silently
-                    set({ user: null, profile: null, isAuthenticated: false })
+                    set({ user: null, profile: null, isAuthenticated: false, authStatus: 'session_expired' })
                 }
             },
 
@@ -129,7 +192,7 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'netlistlab-auth',
-            // Only persist the user profile + auth state, not loading/error
+            // Only persist the user profile + auth state, not loading/error/status
             partialize: (state) => ({
                 user: state.user,
                 profile: state.profile,

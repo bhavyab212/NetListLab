@@ -9,11 +9,23 @@ const PROTECTED_PREFIXES = [
     '/notifications',
 ]
 
+// Public routes that must NEVER be blocked even with a bad session state
+const PUBLIC_PREFIXES = [
+    '/login',
+    '/register',
+    '/reset-password',
+]
+
 // Pattern for /project/:id/edit
 const EDIT_ROUTE_RE = /^\/project\/[^/]+\/edit(\/.*)?$/
 
 export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl
+
+    // Always let public routes through — no session check needed
+    if (PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
+        return NextResponse.next()
+    }
 
     const isProtected =
         PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix)) ||
@@ -42,10 +54,19 @@ export async function middleware(req: NextRequest) {
         data: { session },
     } = await supabase.auth.getSession()
 
+    // No session at all → redirect to login
     if (!session) {
         const loginUrl = req.nextUrl.clone()
         loginUrl.pathname = '/login'
         loginUrl.searchParams.set('redirect', pathname)
+        return NextResponse.redirect(loginUrl)
+    }
+
+    // Session exists but email not confirmed → redirect to login with reason
+    if (!session.user.email_confirmed_at) {
+        const loginUrl = req.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        loginUrl.searchParams.set('reason', 'email_not_confirmed')
         return NextResponse.redirect(loginUrl)
     }
 

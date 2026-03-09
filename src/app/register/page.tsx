@@ -11,9 +11,10 @@ import Button from '@/components/ui/Button';
 import Divider from '@/components/ui/Divider';
 import CircuitBackground from '@/components/ui/CircuitBackground';
 import LiquidCursor from '@/components/ui/LiquidCursor';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Mail } from 'lucide-react';
 import { useThemeStore } from '@/stores/themeStore';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const GoogleIcon = () => (
     <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
@@ -30,12 +31,22 @@ const GitHubIcon = () => (
     </svg>
 );
 
+// ─── View types ───────────────────────────────────────────────────────────────
+type View = 'form' | 'confirm_email';
+
 export default function RegisterPage() {
+    const [view, setView] = useState<View>('form');
+    const [registeredEmail, setRegisteredEmail] = useState('');
+
+    // Form state
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [shake, setShake] = useState(false);
+
+    // Resend loading
+    const [resendLoading, setResendLoading] = useState(false);
 
     const { register, isLoading } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
@@ -43,6 +54,7 @@ export default function RegisterPage() {
 
     const validateEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
+    // ── Register submit ───────────────────────────────────────────────────────
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         const newErrors: Record<string, string> = {};
@@ -59,8 +71,13 @@ export default function RegisterPage() {
         }
 
         const username = email.split('@')[0];
-        const success = await register({ fullName: name, username, email, password });
-        if (success) {
+        const result = await register({ fullName: name, username, email, password });
+
+        if (result === 'confirm_email') {
+            setRegisteredEmail(email);
+            setView('confirm_email');
+            toast.success("Confirmation email sent!", { description: "Check your inbox to activate your account." });
+        } else if (result === true) {
             toast.success("Account created!", { description: "Setting up your profile." });
             router.push('/onboarding');
         } else {
@@ -69,6 +86,20 @@ export default function RegisterPage() {
             toast.error("Registration failed", { description: "Something went wrong. Please try again." });
         }
     }, [name, email, password, register, router]);
+
+    // ── Resend confirmation email ─────────────────────────────────────────────
+    const handleResend = useCallback(async () => {
+        setResendLoading(true);
+        try {
+            const { error } = await supabase.auth.resend({ type: 'signup', email: registeredEmail });
+            if (error) throw error;
+            toast.success("Email resent", { description: "Check your inbox again." });
+        } catch (err) {
+            toast.error("Failed to resend", { description: err instanceof Error ? err.message : 'Try again.' });
+        } finally {
+            setResendLoading(false);
+        }
+    }, [registeredEmail]);
 
     return (
         <div className={isDark ? "dark" : ""}>
@@ -124,86 +155,130 @@ export default function RegisterPage() {
                         }}
                         data-liquid-cursor
                     >
-                        <form onSubmit={handleSubmit}>
-                            <h2 style={{
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                fontWeight: 600,
-                                fontSize: '1.75rem',
-                                lineHeight: 1.25,
-                                color: 'var(--text-primary)',
-                                marginBottom: '4px',
-                            }}>
-                                Start Building
-                            </h2>
-                            <p style={{
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                fontFamily: "'Inter', sans-serif",
-                                marginBottom: '24px',
-                            }}>
-                                Create your professional engineering portfolio
-                            </p>
+                        {/* ── REGISTER FORM VIEW ──────────────────────────── */}
+                        {view === 'form' && (
+                            <form onSubmit={handleSubmit}>
+                                <h2 style={{
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    fontWeight: 600,
+                                    fontSize: '1.75rem',
+                                    lineHeight: 1.25,
+                                    color: 'var(--text-primary)',
+                                    marginBottom: '4px',
+                                }}>
+                                    Start Building
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif",
+                                    marginBottom: '24px',
+                                }}>
+                                    Create your professional engineering portfolio
+                                </p>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <Input
-                                    label="Full Name"
-                                    placeholder="M. Visvesvaraya"
-                                    value={name}
-                                    onChange={setName}
-                                    error={errors.name}
-                                />
-                                <Input
-                                    label="Email address"
-                                    type="email"
-                                    placeholder="you@example.com"
-                                    value={email}
-                                    onChange={setEmail}
-                                    error={errors.email}
-                                />
-                                <Input
-                                    label="Password"
-                                    type="password"
-                                    placeholder="Min. 8 characters"
-                                    value={password}
-                                    onChange={setPassword}
-                                    error={errors.password}
-                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <Input
+                                        label="Full Name"
+                                        placeholder="M. Visvesvaraya"
+                                        value={name}
+                                        onChange={setName}
+                                        error={errors.name}
+                                    />
+                                    <Input
+                                        label="Email address"
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={email}
+                                        onChange={setEmail}
+                                        error={errors.email}
+                                    />
+                                    <Input
+                                        label="Password"
+                                        type="password"
+                                        placeholder="Min. 8 characters"
+                                        value={password}
+                                        onChange={setPassword}
+                                        error={errors.password}
+                                    />
+                                </div>
+
+                                <div style={{ marginTop: '24px' }}>
+                                    <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
+                                        Create Account →
+                                    </Button>
+                                </div>
+
+                                <div style={{ margin: '20px 0' }}>
+                                    <Divider text="or sign up with" />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
+                                        onClick={() => toast.info('OAuth coming soon.')}>
+                                        Google
+                                    </Button>
+                                    <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
+                                        onClick={() => toast.info('OAuth coming soon.')}>
+                                        GitHub
+                                    </Button>
+                                </div>
+
+                                <p style={{
+                                    textAlign: 'center',
+                                    marginTop: '24px',
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif",
+                                }}>
+                                    Already have an account?{' '}
+                                    <Link href="/login" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                                        Sign in
+                                    </Link>
+                                </p>
+                            </form>
+                        )}
+
+                        {/* ── CONFIRM EMAIL VIEW ─────────────────────────── */}
+                        {view === 'confirm_email' && (
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    width: '64px', height: '64px', borderRadius: '50%',
+                                    background: 'var(--accent-primary-10, rgba(99,102,241,0.1))',
+                                    border: '1px solid var(--accent-primary-30, rgba(99,102,241,0.3))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    margin: '0 auto 20px',
+                                }}>
+                                    <Mail size={28} style={{ color: 'var(--accent-primary)' }} />
+                                </div>
+                                <h2 style={{
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    fontWeight: 600, fontSize: '1.5rem',
+                                    color: 'var(--text-primary)', marginBottom: '8px',
+                                }}>
+                                    Check your inbox
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem', color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif", marginBottom: '24px', lineHeight: 1.6,
+                                }}>
+                                    We sent a confirmation link to{' '}
+                                    <strong style={{ color: 'var(--text-primary)' }}>{registeredEmail}</strong>.
+                                    Click it to activate your account.
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <Button variant="primary" fullWidth isLoading={resendLoading} onClick={handleResend}>
+                                        Resend email
+                                    </Button>
+                                    <Link href="/login" style={{
+                                        color: 'var(--accent-primary)', fontSize: '0.875rem',
+                                        fontFamily: "'Inter', sans-serif", textDecoration: 'none',
+                                    }}>
+                                        ← Back to login
+                                    </Link>
+                                </div>
                             </div>
-
-                            <div style={{ marginTop: '24px' }}>
-                                <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
-                                    Create Account →
-                                </Button>
-                            </div>
-
-                            <div style={{ margin: '20px 0' }}>
-                                <Divider text="or sign up with" />
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
-                                    onClick={() => toast.info('OAuth coming soon.')}>
-                                    Google
-                                </Button>
-                                <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
-                                    onClick={() => toast.info('OAuth coming soon.')}>
-                                    GitHub
-                                </Button>
-                            </div>
-
-                            <p style={{
-                                textAlign: 'center',
-                                marginTop: '24px',
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                fontFamily: "'Inter', sans-serif",
-                            }}>
-                                Already have an account?{' '}
-                                <Link href="/login" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                                    Sign in
-                                </Link>
-                            </p>
-                        </form>
+                        )}
                     </motion.div>
                 </motion.div>
             </div>

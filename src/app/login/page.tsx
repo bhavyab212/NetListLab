@@ -11,9 +11,10 @@ import Button from '@/components/ui/Button';
 import Divider from '@/components/ui/Divider';
 import CircuitBackground from '@/components/ui/CircuitBackground';
 import LiquidCursor from '@/components/ui/LiquidCursor';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Mail } from 'lucide-react';
 import { useThemeStore } from '@/stores/themeStore';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const GoogleIcon = () => (
     <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
@@ -30,12 +31,25 @@ const GitHubIcon = () => (
     </svg>
 );
 
+// ─── View types ───────────────────────────────────────────────────────────────
+type View = 'login' | 'forgot' | 'email_not_confirmed';
+
 export default function LoginPage() {
+    const [view, setView] = useState<View>('login');
+
+    // Login form state
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [shake, setShake] = useState(false);
+
+    // Forgot password form state
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
+
+    // Resend state
+    const [resendLoading, setResendLoading] = useState(false);
 
     const { login, isLoading } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
@@ -43,6 +57,7 @@ export default function LoginPage() {
 
     const validateEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
+    // ── Login submit ──────────────────────────────────────────────────────────
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         let hasError = false;
@@ -56,16 +71,55 @@ export default function LoginPage() {
 
         if (hasError) return;
 
-        const success = await login({ email, password });
-        if (success) {
+        const result = await login({ email, password });
+        if (result === true) {
             toast.success("Welcome back!", { description: "Redirecting to your feed." });
             router.push('/explore');
+        } else if (result === 'email_not_confirmed') {
+            setView('email_not_confirmed');
+            toast.warning("Email not confirmed", { description: "Check your inbox and click the confirmation link." });
         } else {
             setShake(true);
             setTimeout(() => setShake(false), 500);
             toast.error("Login failed", { description: "Invalid email or password. Please try again." });
         }
     }, [email, password, login, router]);
+
+    // ── Resend confirmation email ─────────────────────────────────────────────
+    const handleResend = useCallback(async () => {
+        setResendLoading(true);
+        try {
+            const { error } = await supabase.auth.resend({ type: 'signup', email });
+            if (error) throw error;
+            toast.success("Confirmation email resent", { description: "Check your inbox." });
+        } catch (err) {
+            toast.error("Failed to resend", { description: err instanceof Error ? err.message : 'Try again.' });
+        } finally {
+            setResendLoading(false);
+        }
+    }, [email]);
+
+    // ── Forgot password submit ────────────────────────────────────────────────
+    const handleForgotPassword = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!forgotEmail.trim() || !validateEmail(forgotEmail)) {
+            toast.error("Enter a valid email address.");
+            return;
+        }
+        setForgotLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                redirectTo: 'https://netlistlab.vercel.app/reset-password',
+            });
+            if (error) throw error;
+            toast.success("Password reset email sent!", { description: "Check your inbox for the reset link." });
+            setForgotEmail('');
+        } catch (err) {
+            toast.error("Failed to send reset email", { description: err instanceof Error ? err.message : 'Try again.' });
+        } finally {
+            setForgotLoading(false);
+        }
+    }, [forgotEmail]);
 
     return (
         <div className={isDark ? "dark" : ""}>
@@ -123,94 +177,179 @@ export default function LoginPage() {
                         }}
                         data-liquid-cursor
                     >
-                        <form onSubmit={handleSubmit}>
-                            <h2 style={{
-                                fontFamily: "'Space Grotesk', sans-serif",
-                                fontWeight: 600,
-                                fontSize: '1.75rem',
-                                lineHeight: 1.25,
-                                color: 'var(--text-primary)',
-                                marginBottom: '4px',
-                            }}>
-                                Welcome back
-                            </h2>
-                            <p style={{
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                fontFamily: "'Inter', sans-serif",
-                                marginBottom: '24px',
-                            }}>
-                                Sign in to your workshop
-                            </p>
+                        {/* ── LOGIN VIEW ──────────────────────────────────────── */}
+                        {view === 'login' && (
+                            <form onSubmit={handleSubmit}>
+                                <h2 style={{
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    fontWeight: 600,
+                                    fontSize: '1.75rem',
+                                    lineHeight: 1.25,
+                                    color: 'var(--text-primary)',
+                                    marginBottom: '4px',
+                                }}>
+                                    Welcome back
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif",
+                                    marginBottom: '24px',
+                                }}>
+                                    Sign in to your workshop
+                                </p>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                    <Input
+                                        label="Email address"
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={email}
+                                        onChange={setEmail}
+                                        error={emailError}
+                                        autoComplete="email"
+                                    />
+                                    <div>
+                                        <Input
+                                            label="Password"
+                                            type="password"
+                                            placeholder="••••••••"
+                                            value={password}
+                                            onChange={setPassword}
+                                            error={passwordError}
+                                            autoComplete="current-password"
+                                        />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                                            <button type="button" onClick={() => { setForgotEmail(email); setView('forgot'); }} style={{
+                                                background: 'none', border: 'none',
+                                                color: 'var(--accent-primary)',
+                                                fontSize: '0.75rem',
+                                                fontFamily: "'Inter', sans-serif",
+                                                cursor: 'pointer',
+                                            }}>
+                                                Forgot password?
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '24px' }}>
+                                    <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
+                                        Sign In →
+                                    </Button>
+                                </div>
+
+                                <div style={{ margin: '20px 0' }}>
+                                    <Divider text="or continue with" />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
+                                        onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
+                                        Google
+                                    </Button>
+                                    <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
+                                        onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
+                                        GitHub
+                                    </Button>
+                                </div>
+
+                                <p style={{
+                                    textAlign: 'center',
+                                    marginTop: '24px',
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif",
+                                }}>
+                                    Don&apos;t have an account?{' '}
+                                    <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                                        Create one
+                                    </Link>
+                                </p>
+                            </form>
+                        )}
+
+                        {/* ── EMAIL NOT CONFIRMED VIEW ──────────────────────── */}
+                        {view === 'email_not_confirmed' && (
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    width: '64px', height: '64px', borderRadius: '50%',
+                                    background: 'var(--accent-primary-10, rgba(99,102,241,0.1))',
+                                    border: '1px solid var(--accent-primary-30, rgba(99,102,241,0.3))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    margin: '0 auto 20px',
+                                }}>
+                                    <Mail size={28} style={{ color: 'var(--accent-primary)' }} />
+                                </div>
+                                <h2 style={{
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    fontWeight: 600, fontSize: '1.5rem',
+                                    color: 'var(--text-primary)', marginBottom: '8px',
+                                }}>
+                                    Email not confirmed
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem', color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif", marginBottom: '24px', lineHeight: 1.6,
+                                }}>
+                                    We sent a confirmation link to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.
+                                    Click it to activate your account, then sign in here.
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <Button variant="primary" fullWidth isLoading={resendLoading} onClick={handleResend}>
+                                        Resend confirmation email
+                                    </Button>
+                                    <button type="button" onClick={() => setView('login')} style={{
+                                        background: 'none', border: 'none',
+                                        color: 'var(--accent-primary)', fontSize: '0.875rem',
+                                        fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                    }}>
+                                        ← Back to login
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── FORGOT PASSWORD VIEW ──────────────────────────── */}
+                        {view === 'forgot' && (
+                            <form onSubmit={handleForgotPassword}>
+                                <h2 style={{
+                                    fontFamily: "'Space Grotesk', sans-serif",
+                                    fontWeight: 600, fontSize: '1.75rem',
+                                    lineHeight: 1.25, color: 'var(--text-primary)', marginBottom: '4px',
+                                }}>
+                                    Reset password
+                                </h2>
+                                <p style={{
+                                    fontSize: '0.875rem', color: 'var(--text-secondary)',
+                                    fontFamily: "'Inter', sans-serif", marginBottom: '24px',
+                                }}>
+                                    Enter your email and we&apos;ll send you a reset link.
+                                </p>
+
                                 <Input
                                     label="Email address"
                                     type="email"
                                     placeholder="you@example.com"
-                                    value={email}
-                                    onChange={setEmail}
-                                    error={emailError}
+                                    value={forgotEmail}
+                                    onChange={setForgotEmail}
                                     autoComplete="email"
                                 />
-                                <div>
-                                    <Input
-                                        label="Password"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={setPassword}
-                                        error={passwordError}
-                                        autoComplete="current-password"
-                                    />
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-                                        <button type="button" style={{
-                                            background: 'none', border: 'none',
-                                            color: 'var(--accent-primary)',
-                                            fontSize: '0.75rem',
-                                            fontFamily: "'Inter', sans-serif",
-                                            cursor: 'pointer',
-                                        }}>
-                                            Forgot password?
-                                        </button>
-                                    </div>
+
+                                <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <Button type="submit" variant="primary" fullWidth isLoading={forgotLoading}>
+                                        Send reset link
+                                    </Button>
+                                    <button type="button" onClick={() => setView('login')} style={{
+                                        background: 'none', border: 'none',
+                                        color: 'var(--accent-primary)', fontSize: '0.875rem',
+                                        fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                    }}>
+                                        ← Back to login
+                                    </button>
                                 </div>
-                            </div>
-
-                            <div style={{ marginTop: '24px' }}>
-                                <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
-                                    Sign In →
-                                </Button>
-                            </div>
-
-                            <div style={{ margin: '20px 0' }}>
-                                <Divider text="or continue with" />
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
-                                    onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
-                                    Google
-                                </Button>
-                                <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
-                                    onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
-                                    GitHub
-                                </Button>
-                            </div>
-
-                            <p style={{
-                                textAlign: 'center',
-                                marginTop: '24px',
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)',
-                                fontFamily: "'Inter', sans-serif",
-                            }}>
-                                Don't have an account?{' '}
-                                <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                                    Create one
-                                </Link>
-                            </p>
-                        </form>
+                            </form>
+                        )}
                     </motion.div>
                 </motion.div>
             </div>
