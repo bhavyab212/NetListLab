@@ -147,7 +147,7 @@ export default function RegisterPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <Input
                                     label="Full Name"
-                                    placeholder="John Doe"
+                                    placeholder="M. Visvesvaraya"
                                     value={name}
                                     onChange={setName}
                                     error={errors.name}
