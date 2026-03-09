@@ -12,8 +12,28 @@ const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
 // Middleware
 app.use((0, helmet_1.default)());
+// CORS — allow Vercel production, local dev, and any FRONTEND_URL env var
+const allowedOrigins = [
+    'https://netlistlab.vercel.app',
+    'https://netlistlab-git-main-bhavyab212s-projects.vercel.app', // preview deployments
+    'http://localhost:3000',
+    'http://localhost:3001',
+];
+if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (curl, Postman, server-to-server)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.includes(origin))
+            return callback(null, true);
+        // Also allow any *.vercel.app subdomain for preview URLs
+        if (/\.vercel\.app$/.test(origin))
+            return callback(null, true);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true
 }));
 app.use(express_1.default.json({ limit: '10mb' }));

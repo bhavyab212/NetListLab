@@ -22,8 +22,8 @@ async function request<T>(
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
 
-    // Timeout via AbortController
-    const { timeout = 30000, ...restOptions } = options ?? {}
+    // Timeout via AbortController — 60s to handle Render cold starts
+    const { timeout = 60000, ...restOptions } = options ?? {}
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
 
