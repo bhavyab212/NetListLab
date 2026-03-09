@@ -310,7 +310,7 @@ export default function NewProjectPage() {
                                             <div>
                                                 <label className={labelCls}>Cover Image URL</label>
                                                 <ImageUploadInput value={coverUrl} onChange={setCoverUrl} placeholder="https://images.unsplash.com/…" className={inputCls} />
-                                                {coverUrl && <img src={coverUrl} alt="cover preview" className="mt-4 w-full h-48 object-cover rounded-2xl border border-border" onError={() => setCoverUrl("")} />}
+                                                {coverUrl && <img loading="lazy" src={coverUrl} alt="cover preview" className="mt-4 w-full h-48 object-cover rounded-2xl border border-border" onError={() => setCoverUrl("")} />}
                                             </div>
                                             <div>
                                                 <label className={labelCls}>Tech Stack Tags</label>
@@ -458,7 +458,7 @@ export default function NewProjectPage() {
                                                     </div>
                                                     <textarea value={s.body} onChange={e => updateStep(i, "body", e.target.value)} rows={3} placeholder="Describe this step in detail…"
                                                         className="w-full bg-transparent outline-none resize-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 p-4 rounded-xl border border-border bg-muted/20" />
-                                                    {s.imageUrl && <img src={s.imageUrl} alt={`Step ${i + 1}`} className="w-full h-40 object-cover rounded-xl mt-2 border border-border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                                    {s.imageUrl && <img loading="lazy" src={s.imageUrl} alt={`Step ${i + 1}`} className="w-full h-40 object-cover rounded-xl mt-2 border border-border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                                                 </div>
                                             ))}
                                             <button onClick={addStep} className="w-full h-14 rounded-[20px] border-2 border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest">
@@ -744,7 +744,7 @@ export default function NewProjectPage() {
                                             <div className="grid grid-cols-3 gap-3 mb-4">
                                                 {galleryImages.map((img, i) => (
                                                     <div key={i} className="relative aspect-video rounded-xl bg-muted border border-border overflow-hidden group">
-                                                        <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                                        <img loading="lazy" src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                                                         <button onClick={() => setGalleryImages(galleryImages.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500"><Trash2 size={12} /></button>
                                                     </div>
                                                 ))}
@@ -849,7 +849,7 @@ export default function NewProjectPage() {
 
                                         {/* Summary Card */}
                                         <div className="bg-card/60 backdrop-blur-3xl border border-border rounded-[28px] overflow-hidden">
-                                            {coverUrl && <img src={coverUrl} alt="cover" className="w-full h-48 object-cover" />}
+                                            {coverUrl && <img loading="lazy" src={coverUrl} alt="cover" className="w-full h-48 object-cover" />}
                                             <div className="p-8">
                                                 <div className="flex gap-3 mb-4">
                                                     {category && <span className="px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[9px] font-black uppercase tracking-widest">{category}</span>}
