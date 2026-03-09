@@ -14,6 +14,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useContributionStore } from "@/stores/contributionStore";
 import { useSocialStore } from "@/stores/socialStore";
+import { useInteractionsStore } from "@/stores/interactionsStore";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -130,7 +131,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
     <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
       className="flex gap-5">
       <Link href={`/user/${comment.author}`} className="shrink-0">
-        <img src={comment.avatar} alt={comment.author} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
+        <img loading="lazy" src={comment.avatar} alt={comment.author} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
       </Link>
       <div className="flex-1">
         <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-[20px] p-6">
@@ -164,7 +165,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
               className="mt-4 pl-5 border-l-2 border-primary/20 overflow-hidden">
               <div className="flex gap-4 pt-2">
-                <img src={authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest"} className="w-8 h-8 rounded-full border border-border shrink-0" />
+                <img loading="lazy" src={authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest"} className="w-8 h-8 rounded-full border border-border shrink-0" />
                 <div className="flex-1 flex gap-2">
                   <input
                     autoFocus
@@ -185,7 +186,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
               {comment.replies.map(r => (
                 <div key={r.id} className="flex gap-4">
                   <Link href={`/user/${r.author}`} className="shrink-0">
-                    <img src={r.avatar} alt={r.author} className="w-8 h-8 rounded-full border-2 border-border hover:border-primary transition-all" />
+                    <img loading="lazy" src={r.avatar} alt={r.author} className="w-8 h-8 rounded-full border-2 border-border hover:border-primary transition-all" />
                   </Link>
                   <div className="flex-1 bg-card/40 border border-border/30 rounded-[16px] p-5">
                     <div className="flex items-center gap-3 mb-2">
@@ -519,7 +520,7 @@ const SAFETY_COLORS: Record<SafetyLevel, string> = {
   None: "bg-muted text-muted-foreground border-border",
 };
 
-function BuildStepsTab({ level, onPostBuildLog }: { level: string; onPostBuildLog: () => void }) {
+function BuildStepsTab({ level, onPostBuildLog, onCommentStep }: { level: string; onPostBuildLog: () => void; onCommentStep: (step: number, title: string) => void }) {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [completedSubsteps, setCompletedSubsteps] = useState<Record<number, Set<number>>>({});
@@ -815,18 +816,26 @@ function BuildStepsTab({ level, onPostBuildLog }: { level: string; onPostBuildLo
                   <div className="grid grid-cols-2 gap-4">
                     {s.images.map((img, i) => (
                       <div key={i} className="aspect-video rounded-2xl bg-muted border border-border overflow-hidden group/img">
-                        <img src={img} alt={`Step ${s.step} ref ${i + 1}`} className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105" />
+                        <img loading="lazy" src={img} alt={`Step ${s.step} ref ${i + 1}`} className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105" />
                       </div>
                     ))}
                   </div>
 
-                  {/* ── Mark complete ── */}
-                  <button
-                    onClick={() => setCompletedSteps(prev => { const s2 = new Set(prev); s2.has(s.step) ? s2.delete(s.step) : s2.add(s.step); return s2; })}
-                    className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-widest transition-all border ${done ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500" : "border-border hover:border-primary/50 hover:text-primary"}`}>
-                    <CheckCircle2 size={17} />
-                    {done ? "Marked Complete — Click to Undo" : "Mark Step Complete"}
-                  </button>
+                  {/* ── Mark complete & Comment ── */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      onClick={() => setCompletedSteps(prev => { const s2 = new Set(prev); s2.has(s.step) ? s2.delete(s.step) : s2.add(s.step); return s2; })}
+                      className={`flex flex-1 justify-center items-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border ${done ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500" : "border-border hover:border-primary/50 hover:text-primary"}`}>
+                      <CheckCircle2 size={17} />
+                      {done ? "Complete — Undo" : "Mark Complete"}
+                    </button>
+                    <button
+                      onClick={() => onCommentStep(s.step, s.title)}
+                      className="flex flex-1 justify-center items-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border border-border bg-muted/30 hover:bg-primary/10 hover:text-primary hover:border-primary/30">
+                      <MessageSquare size={17} />
+                      Ask Question
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -898,7 +907,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, user: authUser } = useAuthStore();
   const { getProposalsForProject, createProposal } = useContributionStore();
-  const { isFollowing, toggleFollow } = useSocialStore();
+  const { isFollowing, toggleFollow } = useInteractionsStore();
 
   // ── Real API state ──────────────────────────────────────────────────────
   const [apiProject, setApiProject] = useState<ApiProject | null>(null);
@@ -908,7 +917,8 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
 
   // ── UI State ────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("overview");
-  const [isStarred, setIsStarred] = useState(false);
+  const isStarred = useInteractionsStore(s => s.isStarred(id));
+  const toggleStarAction = useInteractionsStore(s => s.toggleStar);
   const [starCount, setStarCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [commentBody, setCommentBody] = useState("");
@@ -939,20 +949,32 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
       setStarCount(proj.star_count);
       setApiComments(comms);
       setApiBOM(bomData);
-    } catch {
-      setApiProject(null);
+    } catch (e: any) {
+      toast.error("Failed to load project", { description: e.message || "Not found" });
+      router.push("/explore");
     } finally {
       setIsPageLoading(false);
     }
-  }, [id]);
+  }, [id, router]);
 
-  useEffect(() => { fetchProject(); }, [fetchProject]);
+  // Once project loads, initialize local starCount if the user hasn't starred it locally yet
+  // We can just set it once when apiProject becomes available
+  useEffect(() => {
+    if (apiProject) setStarCount(apiProject.star_count);
+  }, [apiProject]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // ── Initial data load on mount ─────────────────────────────────────────
+  useEffect(() => {
+    fetchProject();
+    // Increment view count silently (ignores errors)
+    api.incrementViewCount(id);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Build legacy bridge object from API project ────────────────────────
   const project = apiProject ? {
@@ -1028,25 +1050,40 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
     setShowProposeModal(false); setProposalTitle(""); setProposalDesc("");
   };
 
-  const handleReplicate = () => {
-    const tid = toast.loading("Connecting to Lab Node…");
-    setTimeout(() => {
-      toast.success("Artifacts Synced", { id: tid, description: `Build Guide for ${project.title} is ready.`, action: { label: "Download", onClick: () => { } } });
-    }, 2000);
+  const handleReplicate = async () => {
+    const tid = toast.loading("Generating PDF Blueprint…");
+    try {
+      // Opt-in dynamic import so it doesn't break SSR
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.getElementById('project-blueprint-content');
+      if (!element) throw new Error("Content not found");
+
+      const opt = {
+        margin: 10,
+        filename: `${project.title.replace(/\s+/g, '_')}_Blueprint.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt as any).from(element).save();
+      toast.success("Blueprint Downloaded", { id: tid, description: `Build Guide for ${project.title} is ready.` });
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Generation Failed", { id: tid, description: error.message || "Could not create PDF." });
+    }
   };
 
   const handleStar = async () => {
-    setIsStarred(s => !s);
-    setStarCount(c => isStarred ? c - 1 : c + 1);
+    const wasStarred = isStarred;
+    setStarCount(c => wasStarred ? c - 1 : c + 1);
     try {
-      const res = await api.toggleStar(project.id);
-      setStarCount(res.star_count);
-      setIsStarred(res.starred);
-      toast.success(res.starred ? "Project Starred!" : "Removed from Library");
+      await toggleStarAction(project.id);
+      toast.success(!wasStarred ? "Project Starred!" : "Removed from Library");
     } catch {
-      // revert on error
-      setIsStarred(s => !s);
-      setStarCount(c => isStarred ? c + 1 : c - 1);
+      // revert local count update on error
+      setStarCount(c => wasStarred ? c + 1 : c - 1);
+      toast.error("Action failed");
     }
   };
 
@@ -1104,7 +1141,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
 
         {/* Header */}
         <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
-          <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
+          <div className={`w-full max-w-[1600px] flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
             <div className="flex items-center gap-5">
               <button onClick={() => router.push("/explore")} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
@@ -1126,13 +1163,13 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
           </div>
         </header>
 
-        <main className="relative z-10 pt-40 pb-32 px-4 md:px-8">
-          <div className="max-w-7xl mx-auto">
+        <main id="project-blueprint-content" className="relative z-10 pt-40 pb-32 px-4 md:px-8">
+          <div className="max-w-[1600px] mx-auto">
 
             {/* Hero Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 mb-24">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative aspect-[16/10] rounded-[48px] overflow-hidden border border-border shadow-3xl group">
-                <img src={project.image} alt={project.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+                <img loading="lazy" src={project.image} alt={project.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
                 <div className="absolute bottom-8 left-8 flex gap-3">
                   <span className={`px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-2xl border border-white/10 ${project.categoryStyles}`}>{project.category}</span>
@@ -1144,7 +1181,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-center gap-4 mb-8">
                   <Link href={`/user/${project.author}`} className="inline-flex items-center gap-3 p-3 pr-5 rounded-2xl bg-muted/30 border border-border hover:border-primary/50 transition-all group">
                     <div className="relative">
-                      <img src={project.authorAvatar} className="w-11 h-11 rounded-full border-2 border-border group-hover:border-primary transition-all" alt={project.author} />
+                      <img loading="lazy" src={project.authorAvatar} className="w-11 h-11 rounded-full border-2 border-border group-hover:border-primary transition-all" alt={project.author} />
                       <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                     </div>
                     <div>
@@ -1156,14 +1193,19 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                   {/* Follow Button */}
                   {authUser?.id !== project.authorId && (
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!isAuthenticated || !authUser) return toast.error("Login Required");
-                        toggleFollow(authUser.id, project.authorId);
-                        toast.success(isFollowing(project.authorId) ? "Unfollowed" : "Following", { description: `Updates will appear in your feed.` });
+                        const currentlyFollowing = isFollowing(project.author);
+                        toast.success(currentlyFollowing ? "Unfollowed" : "Following", { description: `Updates will appear in your feed.` });
+                        try {
+                          await toggleFollow(project.author);
+                        } catch {
+                          toast.error("Action failed");
+                        }
                       }}
-                      className={`h-11 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${isFollowing(project.authorId) ? "bg-primary/10 border-primary/30 text-primary" : "bg-card border-border hover:border-primary/50 text-foreground"}`}
+                      className={`h-11 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${isFollowing(project.author) ? "bg-primary/10 border-primary/30 text-primary" : "bg-card border-border hover:border-primary/50 text-foreground"}`}
                     >
-                      {isFollowing(project.authorId) ? "Following" : "Follow"}
+                      {isFollowing(project.author) ? "Following" : "Follow"}
                     </button>
                   )}
                 </div>
@@ -1436,7 +1478,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                           </h4>
                           <div className="flex flex-wrap gap-2.5">
                             {project.tags.map(tag => (
-                              <span key={tag} className="px-3.5 py-2 rounded-xl bg-foreground/[0.07] border border-foreground/20 text-[11px] font-black uppercase tracking-widest text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all cursor-default">{tag}</span>
+                              <Link href={`/explore?tags=${encodeURIComponent(tag)}`} key={tag} className="px-3.5 py-2 rounded-xl bg-foreground/[0.07] border border-foreground/20 text-[11px] font-black uppercase tracking-widest text-foreground hover:bg-primary/10 hover:border-primary/50 hover:text-primary transition-all cursor-pointer">{tag}</Link>
                             ))}
                           </div>
                         </div>
@@ -1450,7 +1492,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             <div className="space-y-4">
                               {getForkNetwork(project.id).map(fork => (
                                 <Link key={fork.id} href={`/project/${fork.id}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 border border-transparent hover:border-border text-sm font-bold text-muted-foreground hover:text-foreground transition-all group">
-                                  <img src={fork.authorAvatar} alt={fork.author} className="w-8 h-8 rounded-full border border-border" />
+                                  <img loading="lazy" src={fork.authorAvatar} alt={fork.author} className="w-8 h-8 rounded-full border border-border" />
                                   <div className="flex-1 min-w-0">
                                     <p className="font-black text-xs text-foreground truncate">@{fork.author}</p>
                                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider truncate">{fork.title}</p>
@@ -1468,7 +1510,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             <div className="w-1.5 h-4 bg-accent rounded-full" /> Creator
                           </h4>
                           <Link href={`/user/${project.author}`} className="flex items-center gap-4 group">
-                            <img src={project.authorAvatar} alt={project.author} className="w-12 h-12 rounded-full border-2 border-border group-hover:border-primary transition-all" />
+                            <img loading="lazy" src={project.authorAvatar} alt={project.author} className="w-12 h-12 rounded-full border-2 border-border group-hover:border-primary transition-all" />
                             <div>
                               <p className="font-black text-sm group-hover:text-primary transition-colors">@{project.author}</p>
                               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">{project.category} builder</p>
@@ -1483,15 +1525,16 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                           </h4>
                           <div className="space-y-2">
                             {[
-                              { label: "GitHub Repository", icon: GitBranch, href: "#" },
-                              { label: "Datasheet / Docs", icon: BookOpen, href: "#" },
-                              { label: "Purchase Components", icon: ShoppingCart, href: "#" },
+                              project.githubUrl ? { label: "GitHub Repository", icon: GitBranch, href: project.githubUrl } : null,
+                              project.demoUrl ? { label: "Demo / Video", icon: Globe, href: project.demoUrl } : null,
+                              apiBOM.length > 0 ? { label: "Download BOM (CSV)", icon: ShoppingCart, href: api.getBOMcsvUrl(project.id) } : null,
                               { label: "Share Project", icon: Share2, href: "#" },
-                            ].map(l => (
-                              <a key={l.label} href={l.href}
+                            ].filter(Boolean).map(l => (
+                              <a key={l!.label} href={l!.href} target="_blank" rel="noopener noreferrer"
+                                onClick={l!.href === "#" ? (e) => { e.preventDefault(); handleShare(); } : undefined}
                                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 border border-transparent hover:border-border text-sm font-bold text-muted-foreground hover:text-foreground transition-all group">
                                 <l.icon size={15} className="text-primary group-hover:scale-110 transition-transform" />
-                                {l.label}
+                                {l!.label}
                                 <ExternalLink size={12} className="ml-auto opacity-40" />
                               </a>
                             ))}
@@ -1664,7 +1707,10 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             <div className="flex flex-col gap-2">
                               <Button variant="primary" icon={<ShoppingCart size={15} />} className="px-7 h-12 rounded-[18px] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20">Procure All</Button>
                               <Button variant="ghost" icon={<Download size={15} />} className="px-7 h-10 rounded-[18px] text-[10px] font-black uppercase tracking-widest border border-border"
-                                onClick={() => toast.success("BOM Exported", { description: "CSV downloaded to your device." })}>Export CSV</Button>
+                                onClick={() => {
+                                  toast.success("BOM Export Started", { description: "Downloading CSV file." });
+                                  window.open(api.getBOMcsvUrl(project.id), "_blank");
+                                }}>Export CSV</Button>
                             </div>
                           </div>
                         </div>
@@ -1749,7 +1795,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             <div key={doc.name} className="group rounded-[28px] border border-border bg-card overflow-hidden hover:border-primary/40 hover:-translate-y-1 hover:shadow-2xl transition-all duration-500">
                               {/* Image */}
                               <div className="relative aspect-[16/9] overflow-hidden">
-                                <img src={doc.img} alt={doc.name} className="w-full h-full object-cover opacity-40 group-hover:opacity-20 group-hover:scale-105 transition-all duration-700" />
+                                <img loading="lazy" src={doc.img} alt={doc.name} className="w-full h-full object-cover opacity-40 group-hover:opacity-20 group-hover:scale-105 transition-all duration-700" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
                                 <div className="absolute top-4 left-4">
                                   <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${tagColors[doc.tag] ?? ""}`}>{doc.tag}</span>
@@ -1853,7 +1899,10 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                             { name: "3D Model (.step)", size: "8.2 MB", fmt: "STEP", icon: Award },
                             { name: "Assembly Drawing (.pdf)", size: "1.5 MB", fmt: "PDF", icon: BookOpen },
                           ].map(f => (
-                            <button key={f.name} onClick={() => toast.success("Download Started", { description: `${f.name} queued.` })}
+                            <button key={f.name} onClick={() => {
+                              toast.success("Download Started", { description: `${f.name} queued.` });
+                              if (f.fmt === "CSV") window.open(api.getBOMcsvUrl(project.id), "_blank");
+                            }}
                               className="w-full flex items-center gap-5 p-5 rounded-2xl bg-card border border-border hover:border-primary/40 hover:bg-muted/20 transition-all group">
                               <div className="p-3 rounded-xl bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-all">
                                 <f.icon size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
@@ -1876,7 +1925,15 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                 {/* Build Steps */}
                 {
                   activeTab === "steps" && (
-                    <BuildStepsTab level={project.level || "Beginner"} onPostBuildLog={() => setActiveTab("overview")} />
+                    <BuildStepsTab
+                      level={project.level || "Beginner"}
+                      onPostBuildLog={() => setActiveTab("overview")}
+                      onCommentStep={(step, title) => {
+                        setActiveTab("contributions");
+                        setCommentBody(`[Step ${step}: ${title}] `);
+                        setTimeout(() => document.getElementById("comment-input")?.focus(), 100);
+                      }}
+                    />
                   )
                 }
 
@@ -2414,7 +2471,7 @@ MIT — fork freely, credit appreciated.`,
                       {lightboxImg && (
                         <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4" onClick={() => setLightboxImg(null)}>
                           <button className="absolute top-6 right-6 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all" onClick={() => setLightboxImg(null)}><X size={22} /></button>
-                          <img src={lightboxImg} className="max-w-5xl max-h-[88vh] w-full object-contain rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                          <img loading="lazy" src={lightboxImg} className="max-w-5xl max-h-[88vh] w-full object-contain rounded-3xl shadow-2xl" onClick={e => e.stopPropagation()} />
                         </div>
                       )}
 
@@ -2448,7 +2505,7 @@ MIT — fork freely, credit appreciated.`,
                         <div className="space-y-6">
                           {/* Featured image */}
                           <div className="relative aspect-[21/9] rounded-3xl overflow-hidden border border-border cursor-pointer group" onClick={() => setLightboxImg(galleryImages[0].url)}>
-                            <img src={galleryImages[0].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                            <img loading="lazy" src={galleryImages[0].url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                             <div className="absolute bottom-6 left-6 flex items-center gap-3">
                               <span className="px-4 py-1.5 rounded-full bg-black/50 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-widest border border-white/10">{galleryImages[0].label}</span>
@@ -2462,7 +2519,7 @@ MIT — fork freely, credit appreciated.`,
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {galleryImages.slice(1).map((img, i) => (
                               <div key={i} className="group relative aspect-square rounded-2xl overflow-hidden border border-border cursor-pointer hover:border-primary/40 transition-all" onClick={() => setLightboxImg(img.url)}>
-                                <img src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                <img loading="lazy" src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
                                 <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                                   <span className="text-[9px] text-white font-black uppercase tracking-widest">{img.label}</span>
@@ -2529,7 +2586,7 @@ MIT — fork freely, credit appreciated.`,
                                   {v.id.startsWith("VID") ? (
                                     <Play size={18} className="text-muted-foreground" />
                                   ) : (
-                                    <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} className="w-full h-full object-cover" />
+                                    <img loading="lazy" src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} className="w-full h-full object-cover" />
                                   )}
                                   <span className="absolute bottom-1 right-1 text-[8px] font-black bg-black/80 text-white px-1.5 py-0.5 rounded">{v.duration}</span>
                                 </div>
@@ -2602,7 +2659,7 @@ MIT — fork freely, credit appreciated.`,
                                 <div className="bg-card/60 backdrop-blur-xl border border-border/50 rounded-3xl p-7">
                                   <div className="flex items-start justify-between gap-4 mb-4">
                                     <div className="flex items-center gap-3">
-                                      <img src={log.avatar} className="w-9 h-9 rounded-full border-2 border-border" />
+                                      <img loading="lazy" src={log.avatar} className="w-9 h-9 rounded-full border-2 border-border" />
                                       <div>
                                         <span className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">@{log.author}</span>
                                         <p className="text-[9px] text-muted-foreground/50 font-bold uppercase tracking-widest mt-0.5">{log.date}</p>
@@ -2619,7 +2676,7 @@ MIT — fork freely, credit appreciated.`,
                                     <div className="flex gap-3 mt-5">
                                       {log.images.map((img, j) => (
                                         <div key={j} className="w-28 aspect-video rounded-xl overflow-hidden border border-border cursor-pointer hover:border-primary/40 transition-all" onClick={() => setLightboxImg(img)}>
-                                          <img src={img} className="w-full h-full object-cover" />
+                                          <img loading="lazy" src={img} className="w-full h-full object-cover" />
                                         </div>
                                       ))}
                                     </div>
@@ -2646,12 +2703,12 @@ MIT — fork freely, credit appreciated.`,
                               <motion.div key={i} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.07 }}
                                 className="bg-card/60 border border-border/50 rounded-3xl overflow-hidden hover:border-primary/30 transition-all group">
                                 <div className="aspect-video relative overflow-hidden cursor-pointer" onClick={() => build.images[0] && setLightboxImg(build.images[0])}>
-                                  <img src={build.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                  <img loading="lazy" src={build.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
                                 </div>
                                 <div className="p-5">
                                   <div className="flex items-center gap-3 mb-3">
-                                    <img src={build.avatar} className="w-8 h-8 rounded-full border border-border" />
+                                    <img loading="lazy" src={build.avatar} className="w-8 h-8 rounded-full border border-border" />
                                     <span className="text-[11px] font-black text-primary">@{build.user}</span>
                                   </div>
                                   <p className="text-sm text-muted-foreground font-medium mb-4">{build.caption}</p>
@@ -2809,9 +2866,10 @@ MIT — fork freely, credit appreciated.`,
 
               {/* Post Comment */}
               <div className="flex gap-4 mb-14">
-                <img src={authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest"} alt="you" className="w-11 h-11 rounded-full border-2 border-border shrink-0 mt-1" />
+                <img loading="lazy" src={authUser?.avatar ?? "https://i.pravatar.cc/100?u=guest"} alt="you" className="w-11 h-11 rounded-full border-2 border-border shrink-0 mt-1" />
                 <div className="flex-1 bg-card/60 border border-border rounded-[20px] p-5 flex flex-col gap-4">
                   <textarea
+                    id="comment-input"
                     value={commentBody}
                     onChange={e => setCommentBody(e.target.value)}
                     placeholder={isAuthenticated ? "Add your transmission…" : "Login to post a comment…"}
@@ -2856,7 +2914,7 @@ MIT — fork freely, credit appreciated.`,
         </div>
 
         <footer className="relative z-10 py-20 border-t border-border bg-card/80 backdrop-blur-3xl">
-          <div className="max-w-7xl mx-auto px-8 text-center">
+          <div className="max-w-[1600px] mx-auto px-8 text-center">
             <Logo size="md" />
             <p className="text-[10px] font-black uppercase tracking-[0.5em] text-muted-foreground/30 mt-8">SECURED REPOSITORY // LAB_DOCS_v1.0</p>
           </div>
