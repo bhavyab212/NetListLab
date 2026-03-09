@@ -1,20 +1,24 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useInView } from "react-intersection-observer";
 import {
   Search, Cpu, Bot, Brain, Server, Binary,
   ChevronDown, Filter, Star, MessageSquare, Bell, Plus,
   ArrowRight, GitFork, Download, Share2, ExternalLink,
   Flame, LayoutGrid, History, Menu, X, Sun, Moon,
   ArrowUpDown, TrendingUp, Clock, Zap, Bookmark, ArrowLeft,
-  Box, HardDrive, Wifi, AlertCircle, RefreshCw
+  Box, HardDrive, Wifi, AlertCircle, RefreshCw, Users, UserPlus
 } from "lucide-react";
+import React from 'react';
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useInteractionsStore } from "@/stores/interactionsStore";
 import { api, buildQueryString } from "@/lib/api";
-import type { ApiProject } from "@/lib/api-types";
+import type { ApiProject, ApiUser } from "@/lib/api-types";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
 import LiquidBlob from "@/components/ui/LiquidBlob";
@@ -66,11 +70,10 @@ const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
   </div>
 );
 
-/* ─── Project Card ─── */
 const ProjectCard = ({ project }: { project: ApiProject }) => {
   const { user: authUser, isAuthenticated } = useAuthStore();
-  const [isStarred, setIsStarred] = useState(false);
-  const [localStarCount, setLocalStarCount] = useState(project.star_count);
+  const isStarred = useInteractionsStore(s => s.isStarred(project.id));
+  const toggleStarAction = useInteractionsStore(s => s.toggleStar);
   const router = useRouter();
 
   const handleStar = async (e: React.MouseEvent) => {
@@ -79,32 +82,20 @@ const ProjectCard = ({ project }: { project: ApiProject }) => {
       toast.error("Please log in to continue", { description: "Sign in to star projects." });
       return;
     }
-    // Optimistic update
-    const wasStarred = isStarred;
-    const prevCount = localStarCount;
-    setIsStarred(!wasStarred);
-    setLocalStarCount(wasStarred ? prevCount - 1 : prevCount + 1);
-    toast.success(wasStarred ? "Star removed" : "Project starred ⭐");
+
+    // Optimistic toggle is handled by the store, but we can still show the toast
+    toast.success(!isStarred ? "Project starred ⭐" : "Star removed");
     try {
-      await api.toggleStar(project.id);
+      await toggleStarAction(project.id);
     } catch {
-      // Rollback on error
-      setIsStarred(wasStarred);
-      setLocalStarCount(prevCount);
       toast.error("Something went wrong. Please try again");
     }
   };
 
   const handleReplicate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const id = toast.loading("Connecting to Lab Node…");
-    setTimeout(() => {
-      toast.success("Artifacts Synced", {
-        id,
-        description: `Build Guide for ${project.title} is ready.`,
-        action: { label: "Download", onClick: () => { } },
-      });
-    }, 2000);
+    e.preventDefault();
+    router.push(`/project/${project.id}`);
+    toast.info("Opening Blueprint View", { description: "Download available on the project page." });
   };
 
   const handleFork = async (e: React.MouseEvent) => {
@@ -168,7 +159,7 @@ const ProjectCard = ({ project }: { project: ApiProject }) => {
       <div className="p-7 flex-1 flex flex-col">
         <div className="mb-5 flex items-center gap-3">
           <Link href={`/user/${authorUsername}`} className="relative group/avatar">
-            <img alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-border/50 shadow-sm group-hover/avatar:border-primary transition-all" src={authorAvatar} />
+            <img loading="lazy" alt="Avatar" className="w-9 h-9 rounded-full object-cover border-2 border-border/50 shadow-sm group-hover/avatar:border-primary transition-all" src={authorAvatar} />
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-card" />
           </Link>
           <span className="text-[10px] font-bold text-muted-foreground group-hover:text-primary transition-colors tracking-[0.15em] uppercase">
@@ -187,9 +178,9 @@ const ProjectCard = ({ project }: { project: ApiProject }) => {
 
         <div className="flex flex-wrap gap-2 mb-7">
           {project.tags.slice(0, 3).map(t => (
-            <span key={t} className="px-3 py-1 rounded-xl bg-muted/60 border border-border text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary/40 transition-all">
+            <Link href={`/explore?tags=${encodeURIComponent(t)}`} key={t} className="px-3 py-1 rounded-xl bg-muted/60 border border-border text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary/40 transition-all">
               {t}
-            </span>
+            </Link>
           ))}
         </div>
 
@@ -205,7 +196,7 @@ const ProjectCard = ({ project }: { project: ApiProject }) => {
         <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-5 text-[10px] font-black text-muted-foreground tracking-[0.2em] uppercase">
           <div className="flex gap-5">
             <button onClick={handleStar} className={`flex items-center gap-2 transition-all duration-300 ${isStarred ? "text-amber-500 scale-105" : "hover:text-foreground"}`}>
-              <Star size={15} className={isStarred ? "fill-amber-500" : ""} /> {fmt(localStarCount)}
+              <Star size={15} className={isStarred ? "fill-amber-500" : ""} /> {fmt(project.star_count + (isStarred ? 0 : 0))}
             </button>
             <span className="flex items-center gap-2 hover:text-foreground cursor-default">
               <GitFork size={15} /> {fmt(project.fork_count)}
@@ -282,7 +273,7 @@ const NotificationsDropdown = ({ onClose }: { onClose: () => void }) => {
           notifs.map(n => (
             <div key={n.id} className={`flex items-start gap-4 px-6 py-4 border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer ${!n.read ? "bg-primary/5" : ""}`}
               onClick={() => { if (!n.read) markAsRead(n.id); }}>
-              <img src={n.actorAvatar} alt={n.actor} className="w-9 h-9 rounded-full object-cover border border-border shrink-0 mt-0.5" />
+              <img loading="lazy" src={n.actorAvatar} alt={n.actor} className="w-9 h-9 rounded-full object-cover border border-border shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-foreground leading-snug">
                   <span className="text-primary">@{n.actor}</span>{" "}
@@ -333,11 +324,12 @@ const DIFFICULTY_MAP: Record<string, string | null> = {
 };
 
 /* ─── Main Page ─── */
-export default function ExplorePage() {
+function ExplorePageContent() {
   const { isDark, toggle } = useThemeStore();
   const { isAuthenticated, logout, user: authUser } = useAuthStore();
   const { unreadCount: unreadNotifs } = useNotificationStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
@@ -357,30 +349,54 @@ export default function ExplorePage() {
   // ── API State ──────────────────────────────────────────────────────────────
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { ref: loadMoreRef, inView } = useInView({ threshold: 0.5 });
 
-  const fetchProjects = useCallback(async (search?: string) => {
-    setIsLoading(true);
+  const fetchProjects = useCallback(async (search?: string, fetchPage = 1) => {
+    if (fetchPage === 1) setIsLoading(true);
+    else setIsFetchingNextPage(true);
     setError(null);
     try {
+      const urlTags = searchParams.get("tags");
       const params = buildQueryString({
         type: CATEGORY_TYPE_MAP[selectedCategory] ?? undefined,
         difficulty: DIFFICULTY_MAP[difficulty] ?? undefined,
         sort: SORT_MAP[sortBy] ?? "trending",
         search: search !== undefined ? search : searchQuery,
-        limit: 20,
+        tags: urlTags ?? undefined,
+        limit: 12, // smaller limit to observe pagination easily
+        page: fetchPage,
       });
       const result = await api.getProjects(params || undefined);
-      setProjects(result.projects ?? []);
+      if (fetchPage === 1) {
+        setProjects(result.projects ?? []);
+      } else {
+        setProjects(prev => {
+          const newIds = new Set(result.projects.map(p => p.id));
+          return [...prev, ...result.projects.filter(p => !prev.some(old => newIds.has(old.id)))];
+        });
+      }
       setTotalCount(result.total ?? 0);
+      setHasMore(fetchPage < result.totalPages);
+      setPage(fetchPage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load projects");
     } finally {
       setIsLoading(false);
+      setIsFetchingNextPage(false);
     }
-  }, [selectedCategory, difficulty, sortBy, searchQuery]);
+  }, [selectedCategory, difficulty, sortBy, searchQuery, searchParams]);
+
+  useEffect(() => {
+    if (inView && hasMore && !isLoading && !isFetchingNextPage) {
+      fetchProjects(undefined, page + 1);
+    }
+  }, [inView, hasMore, isLoading, isFetchingNextPage, fetchProjects, page]);
 
   // Fetch on filter change (immediate, no debounce)
   useEffect(() => {
@@ -434,6 +450,22 @@ export default function ExplorePage() {
 
   const featuredProject = projects[0] ?? null;
 
+  const matchingBuilders = React.useMemo(() => {
+    if (!searchQuery) return [];
+    const seen = new Set<string>();
+    const builders: ApiUser[] = [];
+    const q = searchQuery.toLowerCase();
+    for (const p of projects) {
+      if (p.author && !seen.has(p.author.id)) {
+        if (p.author.username.toLowerCase().includes(q) || p.author.full_name?.toLowerCase().includes(q)) {
+          seen.add(p.author.id);
+          builders.push(p.author);
+        }
+      }
+    }
+    return builders;
+  }, [searchQuery, projects]);
+
   const handleCreate = () => {
     if (!isAuthenticated) {
       toast.error("Authentication Required", {
@@ -454,7 +486,7 @@ export default function ExplorePage() {
 
         {/* ─── Header ─── */}
         <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
-          <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
+          <div className={`w-full max-w-[1600px] flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
             <div className="flex items-center gap-5">
               <button onClick={() => router.back()} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
                 <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
@@ -513,7 +545,7 @@ export default function ExplorePage() {
 
                   <Link href="/dashboard">
                     <div className="relative group cursor-pointer">
-                      <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary transition-all" src={authUser?.avatar_url ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
+                      <img loading="lazy" alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border group-hover:border-primary transition-all" src={authUser?.avatar_url ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
                       <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                     </div>
                   </Link>
@@ -566,7 +598,7 @@ export default function ExplorePage() {
         </AnimatePresence>
 
         <main className="relative z-10 pt-36 pb-24 px-4 md:px-8">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-[1600px] mx-auto">
 
             {/* ─── Featured Hero (hidden during search) ─── */}
             <AnimatePresence>
@@ -686,7 +718,9 @@ export default function ExplorePage() {
                 <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-muted-foreground/50 whitespace-nowrap">
                   {searchQuery
                     ? <><span>Results for </span><span className="text-primary">"{searchQuery}"</span></>
-                    : selectedCategory === "All" ? "Laboratory Records" : `${selectedCategory} Systems`
+                    : searchParams.get("tags")
+                      ? <><span>Filtered by </span><span className="text-primary">#{searchParams.get("tags")}</span></>
+                      : selectedCategory === "All" ? "Laboratory Records" : `${selectedCategory} Systems`
                   }
                 </h3>
                 <div className="h-px w-full bg-gradient-to-r from-border to-transparent" />
@@ -696,6 +730,29 @@ export default function ExplorePage() {
                   </span>
                 )}
               </div>
+
+              {/* ─── Matching Builders (Users) ─── */}
+              {searchQuery && matchingBuilders.length > 0 && (
+                <div className="mb-14">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground mb-6 flex items-center gap-2">
+                    <Users size={14} className="text-primary" /> Matching Builders
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {matchingBuilders.map(u => (
+                      <div key={u.id} className="bg-card/40 border border-border rounded-3xl p-5 flex items-center gap-4 hover:border-primary/40 transition-all cursor-pointer group" onClick={() => window.location.href = `/user/${u.username}`}>
+                        <img loading="lazy" src={u.avatar_url ?? `https://i.pravatar.cc/150?u=${u.id}`} alt={u.full_name} className="w-12 h-12 rounded-full border-2 border-border group-hover:border-primary transition-all object-cover" />
+                        <div className="flex-1 min-w-0">
+                          <h5 className="text-sm font-black text-foreground group-hover:text-primary transition-colors truncate">{u.full_name}</h5>
+                          <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/70 truncate">@{u.username}</p>
+                        </div>
+                        <Button variant="ghost" className="w-10 h-10 rounded-full border border-border bg-muted/30 p-0 flex items-center justify-center shrink-0 hover:bg-primary/10 hover:text-primary transition-all">
+                          <UserPlus size={14} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-12">
                 <AnimatePresence mode="popLayout">
@@ -728,11 +785,16 @@ export default function ExplorePage() {
               </div>
 
               {!isLoading && !error && projects.length > 0 && (
-                <div className="mt-24 flex flex-col items-center gap-8">
+                <div className="mt-24 flex flex-col items-center gap-8 text-center">
                   <div className="w-16 h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-full" />
-                  <Button variant="ghost" className="px-12 h-14 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] border border-border bg-card/40 hover:bg-muted/50">
-                    Sync More Records
-                  </Button>
+                  {hasMore ? (
+                    <div ref={loadMoreRef} className="py-10">
+                      <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto" />
+                      <p className="text-[10px] mt-4 uppercase tracking-[0.2em] font-black text-muted-foreground">Syncing more records</p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground/40 mt-6">End of Archives</p>
+                  )}
                 </div>
               )}
             </section>
@@ -741,7 +803,7 @@ export default function ExplorePage() {
 
         {/* ─── Footer ─── */}
         <footer className="relative z-10 bg-card/80 backdrop-blur-3xl border-t border-border pt-24 pb-14">
-          <div className="max-w-7xl mx-auto px-8">
+          <div className="max-w-[1600px] mx-auto px-8">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-24">
               <div className="col-span-1 md:col-span-2">
                 <Logo size="lg" />
@@ -791,5 +853,13 @@ export default function ExplorePage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" /></div>}>
+      <ExplorePageContent />
+    </Suspense>
   );
 }
