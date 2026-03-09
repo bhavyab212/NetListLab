@@ -189,7 +189,7 @@ export default function NotificationsPage() {
                                             className={`flex items-start gap-5 p-6 rounded-[24px] border mb-3 transition-all cursor-pointer ${!n.is_read ? "bg-primary/5 border-primary/10 hover:bg-primary/8" : "bg-card/40 border-border/50 hover:border-primary/20"}`}
                                             onClick={() => markRead(n.id)}>
                                             <div className={`p-3 rounded-2xl border shrink-0 ${s.bg} ${s.border} ${s.color}`}><s.Icon size={17} /></div>
-                                            <img src={actorAvatar} alt={actorUsername} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
+                                            <img loading="lazy" src={actorAvatar} alt={actorUsername} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-foreground leading-snug">
                                                     <Link href={`/user/${actorUsername}`} className="font-black text-primary hover:underline" onClick={e => e.stopPropagation()}>@{actorUsername}</Link>{" "}
