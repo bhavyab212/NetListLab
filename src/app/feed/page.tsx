@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useInView } from "react-intersection-observer";
 import {
     Star, GitFork, MessageSquare, Bookmark, ArrowLeft,
     Sun, Moon, Plus, Flame, Users,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useInteractionsStore } from "@/stores/interactionsStore";
 import { motion, AnimatePresence } from "framer-motion";
 import CircuitBackground from "@/components/ui/CircuitBackground";
 import LiquidCursor from "@/components/ui/LiquidCursor";
@@ -46,9 +48,10 @@ const FeedCard = ({
     project: ApiProject;
     onFork: (project: ApiProject) => void;
 }) => {
-    const [starred, setStarred] = useState(false);
-    const [starCount, setStarCount] = useState(project.star_count);
-    const [bookmarked, setBookmarked] = useState(false);
+    const isStarred = useInteractionsStore(s => s.isStarred(project.id));
+    const toggleStarAction = useInteractionsStore(s => s.toggleStar);
+    const isBookmarked = useInteractionsStore(s => s.isBookmarked(project.id));
+    const toggleBookmarkAction = useInteractionsStore(s => s.toggleBookmark);
 
     const author = project.author;
     const authorUsername = author?.username ?? "unknown";
@@ -57,14 +60,19 @@ const FeedCard = ({
     const categoryStyles = getCategoryStyles(project.project_type);
 
     const handleStar = async () => {
-        setStarred(s => !s);
-        setStarCount(c => starred ? c - 1 : c + 1);
         try {
-            await api.toggleStar(project.id);
+            await toggleStarAction(project.id);
         } catch {
-            // revert on error
-            setStarred(s => !s);
-            setStarCount(c => starred ? c + 1 : c - 1);
+            toast.error("Failed to update star");
+        }
+    };
+
+    const handleBookmark = async () => {
+        try {
+            await toggleBookmarkAction(project.id);
+            toast.success(isBookmarked ? "Removed from library" : "Saved to library");
+        } catch {
+            toast.error("Failed to update bookmark");
         }
     };
 
@@ -78,7 +86,7 @@ const FeedCard = ({
             {/* Author row */}
             <div className="flex items-center gap-4 p-6 pb-4">
                 <Link href={`/user/${authorUsername}`}>
-                    <img src={authorAvatar} alt={authorName} className="w-12 h-12 rounded-full border-2 border-border hover:border-primary transition-all" />
+                    <img loading="lazy" src={authorAvatar} alt={authorName} className="w-12 h-12 rounded-full border-2 border-border hover:border-primary transition-all" />
                 </Link>
                 <div className="flex-1">
                     <Link href={`/user/${authorUsername}`} className="text-sm font-black text-foreground hover:text-primary transition-colors">{authorName}</Link>
@@ -121,9 +129,9 @@ const FeedCard = ({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleStar}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${starred ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted/40 text-muted-foreground border border-border hover:text-amber-500"}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isStarred ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted/40 text-muted-foreground border border-border hover:text-amber-500"}`}
                         >
-                            <Star size={13} className={starred ? "fill-amber-500" : ""} /> {fmt(starCount)}
+                            <Star size={13} className={isStarred ? "fill-amber-500" : ""} /> {fmt(project.star_count + (isStarred ? 0 : 0))}
                         </button>
                         <Link href={`/project/${project.id}#comments`}>
                             <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/40 border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all">
@@ -139,10 +147,10 @@ const FeedCard = ({
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => { setBookmarked(b => !b); toast.success(bookmarked ? "Removed" : "Saved to library"); }}
-                            className={`p-2.5 rounded-full border ${bookmarked ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-primary"} transition-all`}
+                            onClick={handleBookmark}
+                            className={`p-2.5 rounded-full border ${isBookmarked ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/40 border-border text-muted-foreground hover:text-primary"} transition-all`}
                         >
-                            <Bookmark size={14} className={bookmarked ? "fill-primary" : ""} />
+                            <Bookmark size={14} className={isBookmarked ? "fill-primary" : ""} />
                         </button>
                         <Link href={`/project/${project.id}`}>
                             <button className="px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all flex items-center gap-2">
@@ -181,33 +189,36 @@ const TrendingSidebar = ({ projects }: { projects: ApiProject[] }) => {
 
 // ─── Who to Follow ────────────────────────────────────────────────────────────
 const WhoToFollow = ({ suggestions }: { suggestions: ApiUser[] }) => {
-    const [followed, setFollowed] = useState<string[]>([]);
+    const isFollowing = useInteractionsStore(s => s.isFollowing);
+    const toggleFollowAction = useInteractionsStore(s => s.toggleFollow);
+
     return (
         <div className="bg-card/60 border border-border rounded-[24px] p-7">
             <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-6 flex items-center gap-2"><Users size={14} /> Suggested Builders</h3>
             <div className="space-y-5">
-                {suggestions.map(u => (
-                    <div key={u.id} className="flex items-center gap-4">
-                        <Link href={`/user/${u.username}`}>
-                            <img src={u.avatar_url ?? `https://i.pravatar.cc/100?u=${u.id}`} alt={u.full_name} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                            <Link href={`/user/${u.username}`} className="text-sm font-black text-foreground hover:text-primary transition-colors truncate block">{u.full_name}</Link>
-                            <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{u.current_role ?? "Builder"}</p>
+                {suggestions.map(u => {
+                    const following = isFollowing(u.username);
+                    return (
+                        <div key={u.id} className="flex items-center gap-4">
+                            <Link href={`/user/${u.username}`}>
+                                <img loading="lazy" src={u.avatar_url ?? `https://i.pravatar.cc/100?u=${u.id}`} alt={u.full_name} className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all" />
+                            </Link>
+                            <div className="flex-1 min-w-0">
+                                <Link href={`/user/${u.username}`} className="text-sm font-black text-foreground hover:text-primary transition-colors truncate block">{u.full_name}</Link>
+                                <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{u.current_role ?? "Builder"}</p>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    toast.success(following ? `Unfollowed @${u.username}` : `Following @${u.username}!`);
+                                    await toggleFollowAction(u.username).catch(() => toast.error("Action failed"));
+                                }}
+                                className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${following ? "bg-muted/40 border-border text-muted-foreground" : "bg-primary/10 border-primary/20 text-primary hover:bg-primary hover:text-white"}`}
+                            >
+                                {following ? "Following" : "Follow"}
+                            </button>
                         </div>
-                        <button
-                            onClick={async () => {
-                                const isF = followed.includes(u.id);
-                                setFollowed(p => isF ? p.filter(x => x !== u.id) : [...p, u.id]);
-                                toast.success(isF ? `Unfollowed @${u.username}` : `Following @${u.username}!`);
-                                await api.toggleFollow(u.username).catch(() => { });
-                            }}
-                            className={`shrink-0 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${followed.includes(u.id) ? "bg-muted/40 border-border text-muted-foreground" : "bg-primary/10 border-primary/20 text-primary hover:bg-primary hover:text-white"}`}
-                        >
-                            {followed.includes(u.id) ? "Following" : "Follow"}
-                        </button>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
@@ -224,43 +235,70 @@ export default function FeedPage() {
     const [projects, setProjects] = useState<ApiProject[]>([]);
     const [suggestions, setSuggestions] = useState<ApiUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const { ref: loadMoreRef, inView } = useInView({ threshold: 0.5 });
 
+    // Using a ref to track mount status across multiple fetch calls
+    const mounted = useRef(true);
     useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 50);
-        window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
+        mounted.current = true;
+        return () => { mounted.current = false; };
     }, []);
 
-    useEffect(() => {
-        let mounted = true;
-        const fetchFeed = async () => {
-            try {
-                setIsLoading(true);
-                const qs = buildQueryString({ sort: "newest", limit: 20 });
-                const result = await api.getProjects(qs);
-                if (mounted) {
+    const fetchFeed = useCallback(async (fetchPage = 1) => {
+        try {
+            if (fetchPage === 1) setIsLoading(true);
+            else setIsFetchingNextPage(true);
+
+            const qs = buildQueryString({ sort: "newest", limit: 12, page: fetchPage });
+            const result = await api.getProjects(qs);
+
+            if (mounted.current) {
+                if (fetchPage === 1) {
                     setProjects(result.projects);
-                    // Extract unique authors as "suggested builders"
-                    const seen = new Set<string>();
-                    const authors: ApiUser[] = [];
-                    for (const p of result.projects) {
-                        if (p.author && !seen.has(p.author.id) && p.author.id !== authUser?.id) {
-                            seen.add(p.author.id);
-                            authors.push(p.author);
-                            if (authors.length >= 3) break;
-                        }
-                    }
-                    setSuggestions(authors);
+                } else {
+                    setProjects(prev => {
+                        const newIds = new Set(result.projects.map(p => p.id));
+                        return [...prev, ...result.projects.filter(p => !prev.some(old => newIds.has(old.id)))];
+                    });
                 }
-            } catch {
-                // silently use empty state
-            } finally {
-                if (mounted) setIsLoading(false);
+                setHasMore(fetchPage < result.totalPages);
+                setPage(fetchPage);
+
+                // Extract unique authors as "suggested builders"
+                const seen = new Set<string>();
+                const authors: ApiUser[] = [];
+                const all = fetchPage === 1 ? result.projects : [...projects, ...result.projects];
+                for (const p of all) {
+                    if (p.author && !seen.has(p.author.id) && p.author.id !== authUser?.id) {
+                        seen.add(p.author.id);
+                        authors.push(p.author);
+                        if (authors.length >= 3) break;
+                    }
+                }
+                setSuggestions(authors);
             }
-        };
-        fetchFeed();
-        return () => { mounted = false; };
-    }, [authUser?.id]);
+        } catch {
+            // silently use empty state
+        } finally {
+            if (mounted.current) {
+                setIsLoading(false);
+                setIsFetchingNextPage(false);
+            }
+        }
+    }, [authUser?.id, projects]);
+
+    useEffect(() => {
+        fetchFeed(1);
+    }, [authUser?.id]); // initial load
+
+    useEffect(() => {
+        if (inView && hasMore && !isLoading && !isFetchingNextPage) {
+            fetchFeed(page + 1);
+        }
+    }, [inView, hasMore, isLoading, isFetchingNextPage, fetchFeed, page]);
 
     const filteredProjects = feedFilter === "Following"
         ? projects.slice(0, Math.ceil(projects.length / 2))
@@ -308,7 +346,7 @@ export default function FeedPage() {
 
                 {/* Header */}
                 <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
-                    <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
+                    <div className={`w-full max-w-[1600px] flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
                         <div className="flex items-center gap-5">
                             <button onClick={() => router.back()} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
                                 <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
@@ -333,7 +371,7 @@ export default function FeedPage() {
                             </Link>
                             <Link href="/dashboard">
                                 <div className="relative">
-                                    <img alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all cursor-pointer" src={authUser?.avatar_url ?? authUser?.avatar ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
+                                    <img loading="lazy" alt="Avatar" className="w-10 h-10 rounded-full border-2 border-border hover:border-primary transition-all cursor-pointer" src={authUser?.avatar_url ?? authUser?.avatar ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                                 </div>
                             </Link>
@@ -342,7 +380,7 @@ export default function FeedPage() {
                 </header>
 
                 <main className="relative z-10 pt-36 pb-24 px-4 md:px-8">
-                    <div className="max-w-7xl mx-auto">
+                    <div className="max-w-[1600px] mx-auto">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
                             {/* Feed */}
@@ -370,6 +408,17 @@ export default function FeedPage() {
                                         {filteredProjects.length === 0 && (
                                             <div className="py-32 text-center border-2 border-dashed border-muted rounded-[40px]">
                                                 <p className="text-muted-foreground font-medium">No projects in this feed yet.</p>
+                                            </div>
+                                        )}
+                                        {filteredProjects.length > 0 && (
+                                            <div className="mt-14 mb-10 flex flex-col items-center">
+                                                {hasMore ? (
+                                                    <div ref={loadMoreRef} className="py-8">
+                                                        <Loader2 size={24} className="animate-spin text-primary/50" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-16 h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-full opacity-50 block" />
+                                                )}
                                             </div>
                                         )}
                                     </div>
