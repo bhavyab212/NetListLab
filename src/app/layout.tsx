@@ -29,6 +29,7 @@ export const metadata: Metadata = {
 
 import { Toaster } from "sonner";
 import AuthProvider from "@/components/ui/AuthProvider";
+import RealtimeProvider from "@/components/ui/RealtimeProvider";
 
 export default function RootLayout({
   children,
@@ -42,7 +43,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          {children}
+          <RealtimeProvider>
+            {children}
+          </RealtimeProvider>
         </AuthProvider>
         <Toaster position="bottom-right" theme="dark" closeButton richColors />
       </body>
