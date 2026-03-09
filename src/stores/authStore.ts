@@ -6,7 +6,10 @@ import type { ApiUser } from '@/lib/api-types'
 import { toast } from 'sonner'
 
 interface AuthState {
+    // The raw Supabase-synced user profile
     user: ApiUser | null
+    // Alias kept for components that access `profile` separately
+    profile: ApiUser | null
     isAuthenticated: boolean
     isLoading: boolean
     error: string | null
@@ -24,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
             user: null,
+            profile: null,
             isAuthenticated: false,
             isLoading: false,
             error: null,
@@ -37,7 +41,7 @@ export const useAuthStore = create<AuthState>()(
                     if (!data.session) throw new Error('No session returned')
 
                     const profile = await api.getMe()
-                    set({ user: profile, isAuthenticated: true, isLoading: false, error: null })
+                    set({ user: profile, profile, isAuthenticated: true, isLoading: false, error: null })
                     return true
                 } catch (err) {
                     const message = err instanceof Error ? err.message : 'Login failed'
@@ -56,17 +60,26 @@ export const useAuthStore = create<AuthState>()(
                     const supabaseUser = data.user
                     if (!supabaseUser) throw new Error('Registration failed — no user returned')
 
-                    // 2. Create user record in our DB
-                    await api.registerUser({
-                        id: supabaseUser.id,
-                        email,
-                        username,
-                        full_name: fullName,
-                    })
+                    // 2. Sync user record with our DB via /api/auth/sync (master prompt spec)
+                    let profile: ApiUser
+                    try {
+                        profile = await api.syncUser({
+                            id: supabaseUser.id,
+                            email,
+                            username,
+                            full_name: fullName,
+                        })
+                    } catch {
+                        // Fallback: try /api/auth/register if sync endpoint not available yet
+                        profile = await api.registerUser({
+                            id: supabaseUser.id,
+                            email,
+                            username,
+                            full_name: fullName,
+                        })
+                    }
 
-                    // 3. Fetch full profile
-                    const profile = await api.getMe()
-                    set({ user: profile, isAuthenticated: true, isLoading: false, error: null })
+                    set({ user: profile, profile, isAuthenticated: true, isLoading: false, error: null })
                     return true
                 } catch (err) {
                     const message = err instanceof Error ? err.message : 'Registration failed'
@@ -78,7 +91,7 @@ export const useAuthStore = create<AuthState>()(
             // ── Logout ────────────────────────────────────────────────────────────
             logout: async () => {
                 await supabase.auth.signOut()
-                set({ user: null, isAuthenticated: false, error: null })
+                set({ user: null, profile: null, isAuthenticated: false, error: null })
                 toast.success('Logged out', { description: 'See you next time.' })
             },
 
@@ -87,26 +100,29 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const { data: { session } } = await supabase.auth.getSession()
                     if (!session) {
-                        set({ user: null, isAuthenticated: false })
+                        set({ user: null, profile: null, isAuthenticated: false })
                         return
                     }
                     // Only fetch if we don't already have the profile
                     if (!get().user) {
                         const profile = await api.getMe()
-                        set({ user: profile, isAuthenticated: true })
+                        set({ user: profile, profile, isAuthenticated: true })
                     } else {
                         set({ isAuthenticated: true })
                     }
                 } catch {
                     // Session exists but profile fetch failed — clear state silently
-                    set({ user: null, isAuthenticated: false })
+                    set({ user: null, profile: null, isAuthenticated: false })
                 }
             },
 
             // ── Helpers ───────────────────────────────────────────────────────────
             updateProfile: (updates) => {
                 const { user } = get()
-                if (user) set({ user: { ...user, ...updates } })
+                if (user) {
+                    const updated = { ...user, ...updates }
+                    set({ user: updated, profile: updated })
+                }
             },
 
             clearError: () => set({ error: null }),
@@ -116,6 +132,7 @@ export const useAuthStore = create<AuthState>()(
             // Only persist the user profile + auth state, not loading/error
             partialize: (state) => ({
                 user: state.user,
+                profile: state.profile,
                 isAuthenticated: state.isAuthenticated,
             }),
         }
