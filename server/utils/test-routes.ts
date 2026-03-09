@@ -18,7 +18,7 @@ const BOLD = '\x1b[1m';
 let passed = 0;
 let failed = 0;
 
-async function test(
+async function testRoute(
     label: string,
     method: string,
     path: string,
@@ -64,57 +64,57 @@ async function runTests() {
 
     // ── Health Check ───────────────────────────────────────────────────────────
     console.log(`${YELLOW}── Health ──${RESET}`);
-    await test('GET /health', 'GET', '/health', { expectedStatus: 200 });
+    await testRoute('GET /health', 'GET', '/health', { expectedStatus: 200 });
 
     // ── Public Project Routes ──────────────────────────────────────────────────
     console.log(`\n${YELLOW}── Projects (Public) ──${RESET}`);
-    await test('GET /api/projects', 'GET', '/api/projects', { expectedStatus: 200 });
-    await test('GET /api/projects?sort=starred', 'GET', '/api/projects?sort=starred', { expectedStatus: 200 });
-    await test('GET /api/projects?search=robot', 'GET', '/api/projects?search=robot', { expectedStatus: 200 });
-    await test('GET /api/projects?type=ELECTRONICS', 'GET', '/api/projects?type=ELECTRONICS', { expectedStatus: 200 });
-    await test('GET /api/projects/:id (seed)', 'GET', '/api/projects/seed-proj-001', { expectedStatus: 200 });
-    await test('GET /api/projects/:id (not found)', 'GET', '/api/projects/nonexistent-id', { expectedStatus: 404 });
-    await test('GET /api/projects/:id/views', 'GET', '/api/projects/seed-proj-001/views', { expectedStatus: 200 });
+    await testRoute('GET /api/projects', 'GET', '/api/projects', { expectedStatus: 200 });
+    await testRoute('GET /api/projects?sort=starred', 'GET', '/api/projects?sort=starred', { expectedStatus: 200 });
+    await testRoute('GET /api/projects?search=robot', 'GET', '/api/projects?search=robot', { expectedStatus: 200 });
+    await testRoute('GET /api/projects?type=ELECTRONICS', 'GET', '/api/projects?type=ELECTRONICS', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id (seed)', 'GET', '/api/projects/seed-proj-001', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id (not found)', 'GET', '/api/projects/nonexistent-id', { expectedStatus: 404 });
+    await testRoute('GET /api/projects/:id/views', 'GET', '/api/projects/seed-proj-001/views', { expectedStatus: 200 });
 
     // ── BOM ───────────────────────────────────────────────────────────────────
     console.log(`\n${YELLOW}── BOM (Public) ──${RESET}`);
-    await test('GET /api/projects/:id/bom', 'GET', '/api/projects/seed-proj-001/bom', { expectedStatus: 200 });
-    await test('GET /api/projects/:id/bom/csv', 'GET', '/api/projects/seed-proj-001/bom/csv', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id/bom', 'GET', '/api/projects/seed-proj-001/bom', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id/bom/csv', 'GET', '/api/projects/seed-proj-001/bom/csv', { expectedStatus: 200 });
 
     // ── Comments (Public) ─────────────────────────────────────────────────────
     console.log(`\n${YELLOW}── Comments (Public) ──${RESET}`);
-    await test('GET /api/projects/:id/comments', 'GET', '/api/projects/seed-proj-001/comments', { expectedStatus: 200 });
-    await test('GET /api/projects/:id/comments/steps', 'GET', '/api/projects/seed-proj-001/comments/steps', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id/comments', 'GET', '/api/projects/seed-proj-001/comments', { expectedStatus: 200 });
+    await testRoute('GET /api/projects/:id/comments/steps', 'GET', '/api/projects/seed-proj-001/comments/steps', { expectedStatus: 200 });
 
     // ── Users (Public) ────────────────────────────────────────────────────────
     console.log(`\n${YELLOW}── Users (Public) ──${RESET}`);
-    await test('GET /api/users/:username', 'GET', '/api/users/arjun_builds', { expectedStatus: 200 });
-    await test('GET /api/users/:username (not found)', 'GET', '/api/users/this_user_does_not_exist_xyz', { expectedStatus: 404 });
-    await test('GET /api/users/:username/projects', 'GET', '/api/users/arjun_builds/projects', { expectedStatus: 200 });
-    await test('GET /api/users/:username/starred', 'GET', '/api/users/arjun_builds/starred', { expectedStatus: 200 });
-    await test('GET /api/users/:username/followers', 'GET', '/api/users/arjun_builds/followers', { expectedStatus: 200 });
-    await test('GET /api/users/:username/following', 'GET', '/api/users/arjun_builds/following', { expectedStatus: 200 });
+    await testRoute('GET /api/users/:username', 'GET', '/api/users/arjun_builds', { expectedStatus: 200 });
+    await testRoute('GET /api/users/:username (not found)', 'GET', '/api/users/this_user_does_not_exist_xyz', { expectedStatus: 404 });
+    await testRoute('GET /api/users/:username/projects', 'GET', '/api/users/arjun_builds/projects', { expectedStatus: 200 });
+    await testRoute('GET /api/users/:username/starred', 'GET', '/api/users/arjun_builds/starred', { expectedStatus: 200 });
+    await testRoute('GET /api/users/:username/followers', 'GET', '/api/users/arjun_builds/followers', { expectedStatus: 200 });
+    await testRoute('GET /api/users/:username/following', 'GET', '/api/users/arjun_builds/following', { expectedStatus: 200 });
 
     // ── Auth Required (no token = 401) ────────────────────────────────────────
     console.log(`\n${YELLOW}── Auth Guards (should return 401) ──${RESET}`);
-    await test('GET /api/users/me (no auth)', 'GET', '/api/users/me', { expectedStatus: 401 });
-    await test('POST /api/projects (no auth)', 'POST', '/api/projects', { body: { title: 'test' }, expectedStatus: 401 });
-    await test('POST /api/projects/:id/star (no auth)', 'POST', '/api/projects/seed-proj-001/star', { expectedStatus: 401 });
-    await test('POST /api/projects/:id/fork (no auth)', 'POST', '/api/projects/seed-proj-001/fork', { expectedStatus: 401 });
-    await test('GET /api/notifications (no auth)', 'GET', '/api/notifications', { expectedStatus: 401 });
-    await test('POST /api/projects/:id/comments (no auth)', 'POST', '/api/projects/seed-proj-001/comments', { body: { content: 'test' }, expectedStatus: 401 });
-    await test('POST /api/upload/image (no auth)', 'POST', '/api/upload/image', { expectedStatus: 401 });
+    await testRoute('GET /api/users/me (no auth)', 'GET', '/api/users/me', { expectedStatus: 401 });
+    await testRoute('POST /api/projects (no auth)', 'POST', '/api/projects', { body: { title: 'test' }, expectedStatus: 401 });
+    await testRoute('POST /api/projects/:id/star (no auth)', 'POST', '/api/projects/seed-proj-001/star', { expectedStatus: 401 });
+    await testRoute('POST /api/projects/:id/fork (no auth)', 'POST', '/api/projects/seed-proj-001/fork', { expectedStatus: 401 });
+    await testRoute('GET /api/notifications (no auth)', 'GET', '/api/notifications', { expectedStatus: 401 });
+    await testRoute('POST /api/projects/:id/comments (no auth)', 'POST', '/api/projects/seed-proj-001/comments', { body: { content: 'test' }, expectedStatus: 401 });
+    await testRoute('POST /api/upload/image (no auth)', 'POST', '/api/upload/image', { expectedStatus: 401 });
 
     // ── Validation Errors (400) ───────────────────────────────────────────────
     console.log(`\n${YELLOW}── Validation (should return 400/401) ──${RESET}`);
-    await test('POST /api/auth/register (missing fields)', 'POST', '/api/auth/register', {
+    await testRoute('POST /api/auth/register (missing fields)', 'POST', '/api/auth/register', {
         body: { email: 'bad-email' },
         expectedStatus: 400,
     });
 
     // ── 404 ───────────────────────────────────────────────────────────────────
     console.log(`\n${YELLOW}── 404 ──${RESET}`);
-    await test('GET /api/nonexistent', 'GET', '/api/nonexistent-route-xyz', { expectedStatus: 404 });
+    await testRoute('GET /api/nonexistent', 'GET', '/api/nonexistent-route-xyz', { expectedStatus: 404 });
 
     // ── Summary ───────────────────────────────────────────────────────────────
     const total = passed + failed;
