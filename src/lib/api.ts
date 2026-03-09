@@ -172,6 +172,10 @@ export const api = {
     registerUser: (data: { id: string; email: string; username: string; full_name: string; avatar_url?: string }) =>
         request<ApiUser>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
 
+    // POST /api/auth/sync — sync Supabase user with our DB (master prompt spec)
+    syncUser: (data: { id: string; email: string; username: string; full_name: string; avatar_url?: string }) =>
+        request<ApiUser>('/api/auth/sync', { method: 'POST', body: JSON.stringify(data) }),
+
     // ── Uploads ───────────────────────────────────────────────────────────────
     uploadImage: (formData: FormData) =>
         request<ApiUploadResult>('/api/upload/image', { method: 'POST', body: formData }),
