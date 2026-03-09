@@ -48,7 +48,7 @@ export default function RegisterPage() {
     // Resend loading
     const [resendLoading, setResendLoading] = useState(false);
 
-    const { register, isLoading } = useAuthStore();
+    const { register, isLoading, error: authError } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
     const router = useRouter();
 
@@ -83,7 +83,21 @@ export default function RegisterPage() {
         } else {
             setShake(true);
             setTimeout(() => setShake(false), 500);
-            toast.error("Registration failed", { description: "Something went wrong. Please try again." });
+
+            const errorMsg = useAuthStore.getState().error;
+            if (errorMsg?.includes('already exists')) {
+                toast.error("Account already exists", {
+                    description: "An account with this email already exists.",
+                    action: {
+                        label: "Sign in",
+                        onClick: () => router.push('/login')
+                    }
+                });
+            } else {
+                toast.error("Registration failed", {
+                    description: errorMsg || "Something went wrong. Please try again."
+                });
+            }
         }
     }, [name, email, password, register, router]);
 

@@ -101,7 +101,16 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null })
                 try {
                     const { data, error } = await supabase.auth.signUp({ email, password })
-                    if (error) throw new Error(error.message)
+                    if (error) {
+                        if (
+                            error.message.toLowerCase().includes('already registered') ||
+                            error.message.toLowerCase().includes('already exists') ||
+                            error.message.toLowerCase().includes('user already')
+                        ) {
+                            throw new Error('An account with this email already exists. Try logging in instead.')
+                        }
+                        throw new Error(error.message)
+                    }
                     const supabaseUser = data.user
                     if (!supabaseUser) throw new Error('Registration failed — no user returned')
 
