@@ -423,7 +423,7 @@ function ProjectEditPageImpl({ id, project }: { id: string, project: any }) {
                                             </div>
                                             {coverUrl && (
                                                 <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-border">
-                                                    <img src={coverUrl} alt="cover" className="w-full h-full object-cover" onError={() => setCoverUrl("")} />
+                                                    <img loading="lazy" src={coverUrl} alt="cover" className="w-full h-full object-cover" onError={() => setCoverUrl("")} />
                                                     <button onClick={() => { setCoverUrl(""); setIsDirty(true); }} className="absolute top-4 right-4 p-2 rounded-xl bg-black/60 text-white hover:text-rose-400 transition-colors"><Trash2 size={15} /></button>
                                                 </div>
                                             )}
@@ -471,7 +471,7 @@ function ProjectEditPageImpl({ id, project }: { id: string, project: any }) {
                                                         </div>
                                                         <textarea value={s.body} onChange={e => updateStep(i, "body", e.target.value)} rows={3} placeholder="Describe this step in detail…"
                                                             className="w-full bg-transparent outline-none resize-none text-sm font-medium text-foreground placeholder:text-muted-foreground/30 p-4 rounded-xl border border-border bg-muted/20" />
-                                                        {s.imageUrl && <img src={s.imageUrl} alt={`Step ${i + 1}`} className="w-full h-40 object-cover rounded-xl mt-2 border border-border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                                                        {s.imageUrl && <img loading="lazy" src={s.imageUrl} alt={`Step ${i + 1}`} className="w-full h-40 object-cover rounded-xl mt-2 border border-border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                                                     </div>
                                                 ))}
                                                 <button onClick={addStep} className="w-full h-14 rounded-[20px] border-2 border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-widest">
@@ -776,7 +776,7 @@ function ProjectEditPageImpl({ id, project }: { id: string, project: any }) {
                                                 <div className="space-y-3">
                                                     {galleryImages.map((img, i) => (
                                                         <div key={i} className="flex gap-3 items-center bg-muted/20 p-2 border border-border rounded-xl">
-                                                            {img.url ? <img src={img.url} className="w-12 h-12 rounded-lg object-cover shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} /> : <div className="w-12 h-12 rounded-lg bg-muted border border-border shrink-0" />}
+                                                            {img.url ? <img loading="lazy" src={img.url} className="w-12 h-12 rounded-lg object-cover shrink-0" onError={(e) => (e.currentTarget.style.display = 'none')} /> : <div className="w-12 h-12 rounded-lg bg-muted border border-border shrink-0" />}
                                                             <input value={img.label} onChange={e => { setGalleryImages(galleryImages.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x)); setIsDirty(true); }} placeholder="Label (Hero)" className={`${inputCls} bg-transparent border-none w-24 h-10 px-3`} />
                                                             <input value={img.caption} onChange={e => { setGalleryImages(galleryImages.map((x, idx) => idx === i ? { ...x, caption: e.target.value } : x)); setIsDirty(true); }} placeholder="Caption" className={`${inputCls} bg-transparent border-none flex-1 h-10 px-3`} />
                                                             <ImageUploadInput value={img.url} onChange={url => { setGalleryImages(galleryImages.map((x, idx) => idx === i ? { ...x, url } : x)); setIsDirty(true); }} placeholder="Image URL" className={`${inputCls} bg-transparent border-none flex-1 h-10 px-3`} />
