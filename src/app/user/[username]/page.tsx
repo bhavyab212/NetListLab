@@ -6,7 +6,7 @@ import {
   Github, Twitter, Linkedin, Mail, Sun, Moon, MessageSquare,
   TrendingUp, Cpu, ShieldCheck, UserPlus, UserCheck, Edit2, Loader2
 } from "lucide-react";
-import { useSocialStore } from "@/stores/socialStore";
+import { useInteractionsStore } from "@/stores/interactionsStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,7 +40,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const { isAuthenticated, user: authUser } = useAuthStore();
   const [scrolled, setScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState("projects");
-  const { isFollowing, toggleFollow } = useSocialStore();
+  const { isFollowing: checkIsFollowing, toggleFollow } = useInteractionsStore();
 
   const [user, setUser] = useState<ApiUser | null>(null);
   const [userProjects, setUserProjects] = useState<ApiProject[]>([]);
@@ -100,16 +100,20 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     );
   }
 
-  const handleFollow = () => {
+  const handleFollow = async () => {
     if (!isAuthenticated || !authUser) {
       toast.error("Login Required", { description: "You need to be logged in to follow builders." });
       return;
     }
-    toggleFollow(authUser.id, user.id);
-    const nowFollowing = !isFollowing(user.id);
-    toast.success(nowFollowing ? `Following @${user.username}!` : `Unfollowed @${user.username}`, {
-      description: nowFollowing ? "Their artifacts will appear in your feed." : "Removed from your network.",
+    const currentlyFollowing = checkIsFollowing(user.username);
+    toast.success(currentlyFollowing ? `Unfollowed @${user.username}` : `Following @${user.username}!`, {
+      description: currentlyFollowing ? "Removed from your network." : "Their artifacts will appear in your feed.",
     });
+    try {
+      await toggleFollow(user.username);
+    } catch {
+      toast.error("Action failed");
+    }
   };
 
   const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
@@ -130,7 +134,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
         {/* Header */}
         <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 flex justify-center px-4 md:px-8 ${scrolled ? "py-4" : "py-8"}`}>
-          <div className={`w-full max-w-7xl flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
+          <div className={`w-full max-w-[1600px] flex items-center justify-between px-6 md:px-10 transition-all duration-700 ${scrolled ? "h-16 rounded-full bg-card/80 backdrop-blur-3xl border border-border shadow-2xl" : "h-20 rounded-[32px] bg-card/40 backdrop-blur-xl border border-border/50"}`}>
             <div className="flex items-center gap-5">
               <button onClick={() => router.push("/explore")} className="p-3 rounded-full bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all group">
                 <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
@@ -150,19 +154,19 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </Link>
               ) : (
                 <Button
-                  variant={isFollowing(user.id) ? "secondary" : "primary"}
-                  icon={isFollowing(user.id) ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                  variant={checkIsFollowing(user.username) ? "secondary" : "primary"}
+                  icon={checkIsFollowing(user.username) ? <UserCheck size={15} /> : <UserPlus size={15} />}
                   onClick={handleFollow}
                   className="h-11 rounded-full px-7 uppercase text-[10px] font-black tracking-widest hidden sm:flex shadow-lg shadow-primary/10"
                 >
-                  {isFollowing(user.id) ? "Following" : "Follow"}
+                  {checkIsFollowing(user.username) ? "Following" : "Follow"}
                 </Button>
               )}
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-5 md:px-8 pt-40 pb-24 relative z-10">
+        <main className="max-w-[1600px] mx-auto px-5 md:px-8 pt-40 pb-24 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-14 lg:gap-20">
 
             {/* ─── Sidebar ─── */}
@@ -171,7 +175,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 {/* Avatar */}
                 <div className="relative mb-9 group">
                   <div className="w-36 h-36 lg:w-44 lg:h-44 rounded-[40px] overflow-hidden border-4 border-card shadow-3xl bg-muted p-1 group-hover:scale-105 transition-transform duration-500">
-                    <img src={user.avatar_url ?? `https://i.pravatar.cc/150?u=${user.id}`} alt={user.full_name} className="w-full h-full object-cover rounded-[36px]" />
+                    <img loading="lazy" src={user.avatar_url ?? `https://i.pravatar.cc/150?u=${user.id}`} alt={user.full_name} className="w-full h-full object-cover rounded-[36px]" />
                   </div>
                   {user.is_verified && (
                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary rounded-full border-4 border-card flex items-center justify-center text-white shadow-xl">
@@ -212,12 +216,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   </div>
                 )}
 
-                {/* Mobile follow btn */}
+                {/* Follow Actions */}
                 {!isOwnProfile && (
-                  <Button variant={isFollowing(user.id) ? "secondary" : "primary"} fullWidth icon={isFollowing(user.id) ? <UserCheck size={15} /> : <UserPlus size={15} />}
-                    onClick={handleFollow} className="h-12 rounded-2xl font-black uppercase tracking-widest sm:hidden mb-8">
-                    {isFollowing(user.id) ? "Following" : "Follow"}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Button variant={checkIsFollowing(user.username) ? "secondary" : "primary"} onClick={handleFollow} className="px-6 h-12 rounded-[20px] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/10 transition-all hover:scale-105" icon={<UserPlus size={16} />}>
+                      {checkIsFollowing(user.username) ? "Following" : "Follow Builder"}
+                    </Button>
+                    <Button variant="ghost" className="w-12 h-12 rounded-[20px] bg-card border border-border hover:bg-muted text-foreground transition-all hover:scale-105 flex items-center justify-center">
+                      <MessageSquare size={16} />
+                    </Button>
+                  </div>
                 )}
               </motion.div>
 
@@ -281,7 +289,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                             className="bg-card/60 backdrop-blur-xl rounded-[28px] border border-border/50 overflow-hidden flex flex-col hover:border-primary/40 transition-all duration-500 hover:shadow-2xl group cursor-pointer"
                             onClick={() => router.push(`/project/${p.id}`)}>
                             <div className="aspect-[16/10] relative overflow-hidden">
-                              <img src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={p.title} />
+                              <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={p.title} />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                               <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-xl border border-white/10 ${getCategoryStyles(p.project_type)}`}>{p.project_type}</span>
                             </div>
@@ -316,7 +324,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                             className="bg-card/60 backdrop-blur-xl rounded-[28px] border border-border/50 overflow-hidden flex flex-col hover:border-primary/40 transition-all duration-500 hover:shadow-xl group cursor-pointer"
                             onClick={() => router.push(`/project/${p.id}`)}>
                             <div className="aspect-[16/10] relative overflow-hidden">
-                              <img src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={p.title} />
+                              <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={p.title} />
                               <div className="absolute top-4 left-4"><Star size={18} className="text-amber-400 fill-amber-400 drop-shadow-lg" /></div>
                             </div>
                             <div className="p-7">
@@ -349,7 +357,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         </main>
 
         <footer className="relative z-10 py-14 border-t border-border bg-card/80 backdrop-blur-3xl mt-16">
-          <div className="max-w-7xl mx-auto px-8 text-center"><Logo size="sm" /></div>
+          <div className="max-w-[1600px] mx-auto px-8 text-center"><Logo size="sm" /></div>
         </footer>
       </div>
     </div>
