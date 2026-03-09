@@ -14,6 +14,7 @@ import Logo from "@/components/ui/Logo";
 import Button from "@/components/ui/Button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function AccountSettingsPage() {
     const { isDark, toggle } = useThemeStore();
@@ -46,24 +47,36 @@ export default function AccountSettingsPage() {
 
     if (!isAuthenticated) return null;
 
-    const handleEmailChange = () => {
+    const handleEmailChange = async () => {
         if (!newEmail.includes("@")) { toast.error("Invalid email address."); return; }
         const tid = toast.loading("Sending verification…");
-        setTimeout(() => {
+        try {
+            const { error } = await supabase.auth.updateUser({ email: newEmail });
+            if (error) throw error;
             toast.success("Verification Sent", { id: tid, description: `Check ${newEmail} to confirm the change.` });
             setNewEmail("");
-        }, 1200);
+        } catch (err) {
+            toast.error("Update failed", { id: tid, description: err instanceof Error ? err.message : "Try again." });
+        }
     };
 
-    const handlePwdChange = () => {
+    const handlePwdChange = async () => {
         if (!currentPwd) { toast.error("Enter your current password."); return; }
         if (newPwd.length < 8) { toast.error("Password must be at least 8 characters."); return; }
         if (newPwd !== confirmPwd) { toast.error("Passwords don't match."); return; }
         const tid = toast.loading("Updating password…");
-        setTimeout(() => {
+        try {
+            // Re-authenticate first to verify current password
+            const userEmail = authUser?.email ?? "";
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email: userEmail, password: currentPwd });
+            if (signInError) throw new Error("Current password is incorrect.");
+            const { error } = await supabase.auth.updateUser({ password: newPwd });
+            if (error) throw error;
             toast.success("Password Updated", { id: tid, description: "Your credentials have been changed." });
             setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
-        }, 900);
+        } catch (err) {
+            toast.error("Update failed", { id: tid, description: err instanceof Error ? err.message : "Try again." });
+        }
     };
 
     const handleDeleteAccount = () => {
