@@ -30,6 +30,7 @@ export const metadata: Metadata = {
 import { Toaster } from "sonner";
 import AuthProvider from "@/components/ui/AuthProvider";
 import RealtimeProvider from "@/components/ui/RealtimeProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({
   children,
@@ -45,6 +46,7 @@ export default function RootLayout({
         <AuthProvider>
           <RealtimeProvider>
             {children}
+            <Analytics />
           </RealtimeProvider>
         </AuthProvider>
         <Toaster position="bottom-right" theme="dark" closeButton richColors />
