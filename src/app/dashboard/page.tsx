@@ -124,7 +124,7 @@ export default function DashboardPage() {
                         <div className="p-6 border-b border-border">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <img src={authUser.avatar_url ?? authUser.avatar ?? `https://i.pravatar.cc/150?u=${authUser.id}`} alt={authUser.full_name ?? authUser.fullName} className="w-12 h-12 rounded-full border-2 border-border" />
+                                    <img loading="lazy" src={authUser.avatar_url ?? authUser.avatar ?? `https://i.pravatar.cc/150?u=${authUser.id}`} alt={authUser.full_name ?? authUser.fullName} className="w-12 h-12 rounded-full border-2 border-border" />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                                             {myProjects.slice(0, 4).map(p => (
                                                 <div key={p.id} className="bg-card/60 border border-border rounded-[24px] p-6 hover:border-primary/30 transition-all group flex gap-5">
                                                     <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0">
-                                                        <img src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
+                                                        <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <h4 className="text-base font-black font-display text-foreground group-hover:text-primary transition-colors mb-1 truncate">{p.title}</h4>
@@ -263,7 +263,7 @@ export default function DashboardPage() {
                                                 const tk = notifTypeLabel(n.type);
                                                 return (
                                                     <div key={n.id} className={`flex items-center gap-5 p-5 rounded-2xl border transition-all ${!n.is_read ? "bg-primary/5 border-primary/10" : "bg-card/40 border-border/50"} hover:border-primary/30`}>
-                                                        <img src={actorAvatar} alt={actorName} className="w-9 h-9 rounded-full border border-border shrink-0" />
+                                                        <img loading="lazy" src={actorAvatar} alt={actorName} className="w-9 h-9 rounded-full border border-border shrink-0" />
                                                         <p className="text-sm font-medium text-foreground flex-1">
                                                             <span className="font-black text-primary">@{actorName}</span> {tk === "star" ? "starred" : tk === "fork" ? "forked" : tk === "comment" ? "commented on" : tk === "follow" ? "followed you" : "replied to"} your project
                                                             {n.project?.title && <span className="font-black"> &ldquo;{n.project.title}&rdquo;</span>}
@@ -294,7 +294,7 @@ export default function DashboardPage() {
                                         {myProjects.map(p => (
                                             <div key={p.id} className="bg-card/60 border border-border rounded-[24px] p-7 hover:border-primary/30 transition-all group flex flex-col sm:flex-row items-start sm:items-center gap-6">
                                                 <div className="w-24 h-16 rounded-2xl overflow-hidden shrink-0">
-                                                    <img src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
+                                                    <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="text-xl font-black font-display text-foreground group-hover:text-primary transition-colors mb-2">{p.title}</h4>
@@ -335,7 +335,7 @@ export default function DashboardPage() {
                                             <Link key={p.id} href={`/project/${p.id}`}>
                                                 <div className="bg-card/60 border border-border rounded-[24px] overflow-hidden hover:border-primary/30 transition-all group">
                                                     <div className="aspect-[16/9] relative overflow-hidden">
-                                                        <img src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80`} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                        <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80`} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                                                         <div className="absolute top-4 left-4"><Star size={18} className="text-amber-400 fill-amber-400" /></div>
                                                     </div>
                                                     <div className="p-6">
@@ -376,7 +376,7 @@ export default function DashboardPage() {
                                             return (
                                                 <div key={n.id} onClick={() => { setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x)); api.markOneRead(n.id).catch(() => { }); }}
                                                     className={`flex items-start gap-5 p-6 rounded-[20px] border transition-all cursor-pointer ${!n.is_read ? "bg-primary/5 border-primary/10" : "bg-card/40 border-border/50"} hover:border-primary/30`}>
-                                                    <img src={actorAvatar} alt={actorName} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
+                                                    <img loading="lazy" src={actorAvatar} alt={actorName} className="w-11 h-11 rounded-full border-2 border-border shrink-0" />
                                                     <div className="flex-1">
                                                         <p className="text-sm font-medium text-foreground leading-snug mb-2">
                                                             <span className="font-black text-primary">@{actorName}</span> {tk === "follow" ? "followed you" : `${tk === "star" ? "starred" : tk === "fork" ? "forked" : tk === "comment" ? "commented on" : "replied to"} your project`}
