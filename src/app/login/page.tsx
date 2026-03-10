@@ -15,6 +15,7 @@ import { Sun, Moon, Mail } from 'lucide-react';
 import { useThemeStore } from '@/stores/themeStore';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const GoogleIcon = () => (
     <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
@@ -44,6 +45,11 @@ export default function LoginPage() {
     const [passwordError, setPasswordError] = useState('');
     const [shake, setShake] = useState(false);
 
+    const [loginMode, setLoginMode] = useState<'password' | 'otp'>('password')
+    const [otpSent, setOtpSent] = useState(false)
+    const [otpValue, setOtpValue] = useState('')
+    const [otpLoading, setOtpLoading] = useState(false)
+
     // Forgot password form state
     const [forgotEmail, setForgotEmail] = useState('');
     const [forgotLoading, setForgotLoading] = useState(false);
@@ -51,7 +57,7 @@ export default function LoginPage() {
     // Resend state
     const [resendLoading, setResendLoading] = useState(false);
 
-    const { login, isLoading } = useAuthStore();
+    const { login, isLoading, sendOtp, verifyOtp } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
     const router = useRouter();
 
@@ -179,94 +185,283 @@ export default function LoginPage() {
                     >
                         {/* ── LOGIN VIEW ──────────────────────────────────────── */}
                         {view === 'login' && (
-                            <form onSubmit={handleSubmit}>
-                                <h2 style={{
-                                    fontFamily: "'Space Grotesk', sans-serif",
-                                    fontWeight: 600,
-                                    fontSize: '1.75rem',
-                                    lineHeight: 1.25,
-                                    color: 'var(--text-primary)',
-                                    marginBottom: '4px',
-                                }}>
-                                    Welcome back
-                                </h2>
-                                <p style={{
-                                    fontSize: '0.875rem',
-                                    color: 'var(--text-secondary)',
-                                    fontFamily: "'Inter', sans-serif",
-                                    marginBottom: '24px',
-                                }}>
-                                    Sign in to your workshop
-                                </p>
+                            <div style={{ width: '100%' }}>
+                                {!(loginMode === 'otp' && otpSent) && (
+                                    <>
+                                        <h2 style={{
+                                            fontFamily: "'Space Grotesk', sans-serif",
+                                            fontWeight: 600,
+                                            fontSize: '1.75rem',
+                                            lineHeight: 1.25,
+                                            color: 'var(--text-primary)',
+                                            marginBottom: '4px',
+                                        }}>
+                                            Welcome back
+                                        </h2>
+                                        <p style={{
+                                            fontSize: '0.875rem',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif",
+                                            marginBottom: '24px',
+                                        }}>
+                                            Sign in to your workshop
+                                        </p>
+                                    </>
+                                )}
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                    <Input
-                                        label="Email address"
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={setEmail}
-                                        error={emailError}
-                                        autoComplete="email"
-                                    />
-                                    <div>
-                                        <Input
-                                            label="Password"
-                                            type="password"
-                                            placeholder="••••••••"
-                                            value={password}
-                                            onChange={setPassword}
-                                            error={passwordError}
-                                            autoComplete="current-password"
-                                        />
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-                                            <button type="button" onClick={() => { setForgotEmail(email); setView('forgot'); }} style={{
-                                                background: 'none', border: 'none',
-                                                color: 'var(--accent-primary)',
-                                                fontSize: '0.75rem',
-                                                fontFamily: "'Inter', sans-serif",
-                                                cursor: 'pointer',
+                                {!(loginMode === 'otp' && otpSent) && (
+                                    <div style={{
+                                        display: 'flex',
+                                        background: 'var(--bg-elevated, rgba(255,255,255,0.05))',
+                                        borderRadius: '12px',
+                                        padding: '4px',
+                                        marginBottom: '24px',
+                                        border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
+                                    }}>
+                                        {(['password', 'otp'] as const).map(mode => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => { setLoginMode(mode); setOtpSent(false); setOtpValue('') }}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '8px 0',
+                                                    borderRadius: '8px',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    fontFamily: "'Inter', sans-serif",
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: 500,
+                                                    transition: 'all 200ms ease',
+                                                    background: loginMode === mode ? 'var(--accent-primary)' : 'transparent',
+                                                    color: loginMode === mode ? '#fff' : 'var(--text-secondary)',
+                                                }}
+                                            >
+                                                {mode === 'password' ? '🔑 Password' : '✨ Magic Code'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {loginMode === 'password' && (
+                                    <form onSubmit={handleSubmit}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            <Input
+                                                label="Email address"
+                                                type="email"
+                                                placeholder="you@example.com"
+                                                value={email}
+                                                onChange={setEmail}
+                                                error={emailError}
+                                                autoComplete="email"
+                                            />
+                                            <div>
+                                                <Input
+                                                    label="Password"
+                                                    type="password"
+                                                    placeholder="••••••••"
+                                                    value={password}
+                                                    onChange={setPassword}
+                                                    error={passwordError}
+                                                    autoComplete="current-password"
+                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                                                    <button type="button" onClick={() => { setForgotEmail(email); setView('forgot'); }} style={{
+                                                        background: 'none', border: 'none',
+                                                        color: 'var(--accent-primary)',
+                                                        fontSize: '0.75rem',
+                                                        fontFamily: "'Inter', sans-serif",
+                                                        cursor: 'pointer',
+                                                    }}>
+                                                        Forgot password?
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ marginTop: '24px' }}>
+                                            <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
+                                                Sign In →
+                                            </Button>
+                                        </div>
+
+                                        <div style={{ margin: '20px 0' }}>
+                                            <Divider text="or continue with" />
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
+                                                onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
+                                                Google
+                                            </Button>
+                                            <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
+                                                onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
+                                                GitHub
+                                            </Button>
+                                        </div>
+
+                                        <p style={{
+                                            textAlign: 'center',
+                                            marginTop: '24px',
+                                            fontSize: '0.875rem',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif",
+                                        }}>
+                                            Don&apos;t have an account?{' '}
+                                            <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                                                Create one
+                                            </Link>
+                                        </p>
+                                    </form>
+                                )}
+
+                                {loginMode === 'otp' && !otpSent && (
+                                    <form onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        if (!email.trim() || !validateEmail(email)) {
+                                            setEmailError('Enter a valid email address');
+                                            return;
+                                        }
+                                        setEmailError('');
+                                        setOtpLoading(true);
+                                        const ok = await sendOtp(email);
+                                        setOtpLoading(false);
+                                        if (ok) {
+                                            setOtpSent(true);
+                                            toast.success("Magic code sent!", { description: "Check your inbox." });
+                                        } else {
+                                            toast.error("Failed to send code", { description: useAuthStore.getState().error || 'Try again.' });
+                                            setShake(true); setTimeout(() => setShake(false), 500);
+                                        }
+                                    }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            <Input
+                                                label="Email address"
+                                                type="email"
+                                                placeholder="you@example.com"
+                                                value={email}
+                                                onChange={setEmail}
+                                                error={emailError}
+                                                autoComplete="email"
+                                            />
+                                        </div>
+
+                                        <div style={{ marginTop: '24px' }}>
+                                            <Button type="submit" variant="primary" fullWidth isLoading={otpLoading}>
+                                                Send Magic Code →
+                                            </Button>
+                                        </div>
+
+                                        <p style={{
+                                            textAlign: 'center',
+                                            marginTop: '16px',
+                                            fontSize: '0.875rem',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif",
+                                        }}>
+                                            We&apos;ll email you a 6-digit code. No password needed.
+                                        </p>
+
+                                        <p style={{
+                                            textAlign: 'center',
+                                            marginTop: '24px',
+                                            fontSize: '0.875rem',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif",
+                                        }}>
+                                            Don&apos;t have an account?{' '}
+                                            <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                                                Create one
+                                            </Link>
+                                        </p>
+                                    </form>
+                                )}
+
+                                {loginMode === 'otp' && otpSent && (
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{
+                                            width: '64px', height: '64px', borderRadius: '50%',
+                                            background: 'var(--accent-primary-10, rgba(99,102,241,0.1))',
+                                            border: '1px solid var(--accent-primary-30, rgba(99,102,241,0.3))',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            margin: '0 auto 20px',
+                                        }}>
+                                            <Mail size={28} style={{ color: 'var(--accent-primary)' }} />
+                                        </div>
+                                        <h2 style={{
+                                            fontFamily: "'Space Grotesk', sans-serif",
+                                            fontWeight: 600, fontSize: '1.5rem',
+                                            color: 'var(--text-primary)', marginBottom: '8px',
+                                        }}>
+                                            Enter your code
+                                        </h2>
+                                        <p style={{
+                                            fontSize: '0.875rem', color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif", marginBottom: '24px', lineHeight: 1.6,
+                                        }}>
+                                            We sent a 6-digit code to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+                                        </p>
+
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                            <InputOTP maxLength={6} value={otpValue} onChange={setOtpValue}>
+                                                <InputOTPGroup>
+                                                    <InputOTPSlot index={0} />
+                                                    <InputOTPSlot index={1} />
+                                                    <InputOTPSlot index={2} />
+                                                    <InputOTPSlot index={3} />
+                                                    <InputOTPSlot index={4} />
+                                                    <InputOTPSlot index={5} />
+                                                </InputOTPGroup>
+                                            </InputOTP>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <Button variant="primary" fullWidth isLoading={otpLoading} onClick={async () => {
+                                                if (otpValue.length !== 6) return;
+                                                setOtpLoading(true);
+                                                const result = await verifyOtp(email, otpValue);
+                                                setOtpLoading(false);
+                                                if (result === 'authenticated') {
+                                                    toast.success("Welcome back!");
+                                                    router.push('/explore');
+                                                } else if (result === 'new_user') {
+                                                    toast.success("Account created!");
+                                                    router.push('/onboarding');
+                                                } else {
+                                                    toast.error("Invalid or expired code. Try again.");
+                                                    setShake(true); setTimeout(() => setShake(false), 500);
+                                                    setOtpValue('');
+                                                }
                                             }}>
-                                                Forgot password?
+                                                Verify & Sign In →
+                                            </Button>
+
+                                            <button type="button" onClick={async () => {
+                                                setOtpLoading(true);
+                                                const ok = await sendOtp(email);
+                                                setOtpLoading(false);
+                                                if (ok) toast.success("Magic code sent!", { description: "Check your inbox." });
+                                                else toast.error("Failed to send code", { description: useAuthStore.getState().error || 'Try again.' });
+                                            }} style={{
+                                                background: 'none', border: 'none',
+                                                color: 'var(--text-secondary)', fontSize: '0.875rem',
+                                                fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                            }}>
+                                                Resend code
+                                            </button>
+
+                                            <button type="button" onClick={() => { setLoginMode('password'); setOtpSent(false); }} style={{
+                                                background: 'none', border: 'none',
+                                                color: 'var(--accent-primary)', fontSize: '0.875rem',
+                                                fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                                marginTop: '8px'
+                                            }}>
+                                                ← Use password instead
                                             </button>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div style={{ marginTop: '24px' }}>
-                                    <Button type="submit" variant="primary" fullWidth isLoading={isLoading}>
-                                        Sign In →
-                                    </Button>
-                                </div>
-
-                                <div style={{ margin: '20px 0' }}>
-                                    <Divider text="or continue with" />
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
-                                        onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
-                                        Google
-                                    </Button>
-                                    <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
-                                        onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
-                                        GitHub
-                                    </Button>
-                                </div>
-
-                                <p style={{
-                                    textAlign: 'center',
-                                    marginTop: '24px',
-                                    fontSize: '0.875rem',
-                                    color: 'var(--text-secondary)',
-                                    fontFamily: "'Inter', sans-serif",
-                                }}>
-                                    Don&apos;t have an account?{' '}
-                                    <Link href="/register" style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                                        Create one
-                                    </Link>
-                                </p>
-                            </form>
+                                )}
+                            </div>
                         )}
 
                         {/* ── EMAIL NOT CONFIRMED VIEW ──────────────────────── */}

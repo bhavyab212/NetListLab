@@ -29,6 +29,8 @@ interface AuthState {
     register: (data: { email: string; password: string; username: string; fullName: string }) => Promise<true | false | 'confirm_email'>
     logout: () => Promise<void>
     checkAuth: () => Promise<void>
+    sendOtp: (email: string) => Promise<boolean>
+    verifyOtp: (email: string, token: string) => Promise<'authenticated' | 'new_user' | false>
     updateProfile: (updates: Partial<ApiUser>) => void
     clearError: () => void
 }
@@ -42,6 +44,64 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
             authStatus: 'idle',
+
+            // ── OTP ─────────────────────────────────────────────────────────────
+            sendOtp: async (email) => {
+                set({ isLoading: true, error: null })
+                try {
+                    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+                    if (error) throw new Error(error.message)
+                    set({ isLoading: false })
+                    return true
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'OTP request failed'
+                    set({ error: message, isLoading: false })
+                    return false
+                }
+            },
+
+            verifyOtp: async (email, token) => {
+                set({ isLoading: true, error: null })
+                try {
+                    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+                    if (error) throw new Error(error.message)
+                    
+                    const supabaseUser = data.user
+                    if (!supabaseUser) throw new Error('Verification failed — no user returned')
+
+                    let profile: ApiUser | null = null
+                    let isNewUser = false
+
+                    try {
+                        profile = await api.getMe()
+                    } catch {
+                        // Backend has no profile yet — try to sync the user record
+                        try {
+                            const username = email.split('@')[0]
+                            const fullName = supabaseUser.user_metadata?.full_name ?? ''
+                            profile = await api.syncUser({ id: supabaseUser.id, email, username, full_name: fullName })
+                            isNewUser = true
+                        } catch {
+                            // Sync failed
+                        }
+                    }
+
+                    set({
+                        user: profile,
+                        profile,
+                        isAuthenticated: true,
+                        isLoading: false,
+                        error: null,
+                        authStatus: profile ? 'authenticated' : 'profile_incomplete'
+                    })
+                    
+                    return isNewUser ? 'new_user' : 'authenticated'
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'OTP verification failed'
+                    set({ error: message, isLoading: false })
+                    return false
+                }
+            },
 
             // ── Login ─────────────────────────────────────────────────────────────
             login: async ({ email, password }) => {
@@ -160,31 +220,52 @@ export const useAuthStore = create<AuthState>()(
                 set({ authStatus: 'loading' })
                 try {
                     const { data: { session } } = await supabase.auth.getSession()
+                    
                     if (!session) {
-                        set({ user: null, profile: null, isAuthenticated: false, authStatus: 'unauthenticated' })
+                        set({ 
+                            user: null, 
+                            profile: null, 
+                            isAuthenticated: false, 
+                            authStatus: 'unauthenticated' 
+                        })
                         return
                     }
 
                     // Email not yet confirmed
                     if (!session.user.email_confirmed_at) {
-                        set({ user: null, profile: null, isAuthenticated: false, authStatus: 'email_not_confirmed' })
+                        set({ 
+                            user: null, 
+                            profile: null, 
+                            isAuthenticated: false, 
+                            authStatus: 'email_not_confirmed' 
+                        })
                         return
                     }
 
-                    // Try to get/restore backend profile
+                    // ✅ Valid session = user IS authenticated
+                    // Set this IMMEDIATELY before trying backend
+                    set({ isAuthenticated: true, authStatus: 'authenticated' })
+
+                    // Now try to get backend profile (non-blocking)
                     if (!get().user) {
                         try {
                             const profile = await api.getMe()
-                            set({ user: profile, profile, isAuthenticated: true, authStatus: 'authenticated' })
+                            set({ user: profile, profile, authStatus: 'authenticated' })
                         } catch {
-                            // Session valid but no backend profile — mark incomplete, still auth'd
-                            set({ isAuthenticated: true, authStatus: 'profile_incomplete' })
+                            // Backend failed (cold start, network, etc.)
+                            // DO NOT set isAuthenticated = false here
+                            // User still has valid Supabase session
+                            set({ authStatus: 'profile_incomplete' })
                         }
-                    } else {
-                        set({ isAuthenticated: true, authStatus: 'authenticated' })
                     }
                 } catch {
-                    set({ user: null, profile: null, isAuthenticated: false, authStatus: 'session_expired' })
+                    // Only set unauthenticated if getSession() itself fails
+                    set({ 
+                        user: null, 
+                        profile: null, 
+                        isAuthenticated: false, 
+                        authStatus: 'session_expired' 
+                    })
                 }
             },
 
