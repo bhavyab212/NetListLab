@@ -31,6 +31,7 @@ interface AuthState {
     checkAuth: () => Promise<void>
     sendOtp: (email: string) => Promise<boolean>
     verifyOtp: (email: string, token: string) => Promise<'authenticated' | 'new_user' | false>
+    loginWithGoogle: () => Promise<void>
     updateProfile: (updates: Partial<ApiUser>) => void
     clearError: () => void
 }
@@ -105,6 +106,28 @@ export const useAuthStore = create<AuthState>()(
                     const message = err instanceof Error ? err.message : 'OTP verification failed'
                     set({ error: message, isLoading: false })
                     return false
+                }
+            },
+
+            loginWithGoogle: async () => {
+                set({ isLoading: true, error: null })
+                try {
+                    const { error } = await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: {
+                            redirectTo: `${window.location.origin}/auth/callback`,
+                            queryParams: {
+                                access_type: 'offline',
+                                prompt: 'consent',
+                            }
+                        }
+                    })
+                    if (error) throw new Error(error.message)
+                    // Don't set isLoading: false here — page will redirect
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Google login failed'
+                    set({ error: message, isLoading: false })
+                    toast.error('Google login failed', { description: message })
                 }
             },
 

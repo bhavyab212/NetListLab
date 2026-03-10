@@ -72,7 +72,7 @@ export default function RegisterPage() {
     const [regOtpValue, setRegOtpValue] = useState('')
     const [regOtpLoading, setRegOtpLoading] = useState(false)
 
-    const { register, isLoading, error: authError, sendOtp, verifyOtp } = useAuthStore();
+    const { register, isLoading, error: authError, sendOtp, verifyOtp, loginWithGoogle } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
     const router = useRouter();
 
@@ -329,8 +329,8 @@ export default function RegisterPage() {
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
-                                                onClick={() => toast.info('OAuth coming soon.')}>
-                                                Google
+                                                onClick={async () => { await loginWithGoogle(); }}>
+                                                Continue with Google
                                             </Button>
                                             <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
                                                 onClick={() => toast.info('OAuth coming soon.')}>

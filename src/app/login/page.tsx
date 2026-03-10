@@ -57,7 +57,7 @@ export default function LoginPage() {
     // Resend state
     const [resendLoading, setResendLoading] = useState(false);
 
-    const { login, isLoading, sendOtp, verifyOtp } = useAuthStore();
+    const { login, isLoading, sendOtp, verifyOtp, loginWithGoogle } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
     const router = useRouter();
 
@@ -291,8 +291,8 @@ export default function LoginPage() {
 
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <Button type="button" variant="secondary" fullWidth icon={<GoogleIcon />}
-                                                onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>
-                                                Google
+                                                onClick={async () => { await loginWithGoogle(); }}>
+                                                Continue with Google
                                             </Button>
                                             <Button type="button" variant="secondary" fullWidth icon={<GitHubIcon />}
                                                 onClick={() => toast.info('OAuth coming soon. Use email login for now.')}>

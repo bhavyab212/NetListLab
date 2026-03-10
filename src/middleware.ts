@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
     '/login',
     '/register',
     '/reset-password',
+    '/auth/callback',
 ]
 
 const EDIT_ROUTE_RE = /^\/project\/[^/]+\/edit(\/.*)?$/
@@ -80,5 +81,6 @@ export const config = {
         '/project/:id/edit',
         '/settings/:path*',
         '/notifications/:path*',
+        '/auth/callback',
     ],
 }
