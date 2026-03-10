@@ -222,11 +222,11 @@ export default function RegisterPage() {
                                 {!(regMode === 'otp' && regOtpSent) && (
                                     <div style={{
                                         display: 'flex',
-                                        background: 'var(--bg-elevated, rgba(255,255,255,0.05))',
+                                        background: 'var(--muted, rgba(255,255,255,0.05))',
                                         borderRadius: '12px',
                                         padding: '4px',
                                         marginBottom: '24px',
-                                        border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
+                                        border: '1px solid var(--border, rgba(255,255,255,0.08))',
                                     }}>
                                         {(['password', 'otp'] as const).map(mode => (
                                             <button
