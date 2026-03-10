@@ -49,7 +49,12 @@ export const useAuthStore = create<AuthState>()(
             sendOtp: async (email) => {
                 set({ isLoading: true, error: null })
                 try {
-                    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+                    const { error } = await supabase.auth.signInWithOtp({
+                        email,
+                        options: {
+                            shouldCreateUser: true,
+                        }
+                    })
                     if (error) throw new Error(error.message)
                     set({ isLoading: false })
                     return true
