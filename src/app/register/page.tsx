@@ -64,15 +64,17 @@ export default function RegisterPage() {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [shake, setShake] = useState(false);
 
-    // Resend loading
-    const [resendLoading, setResendLoading] = useState(false);
+    const [pendingName, setPendingName] = useState('')
+    const [showOtpVerify, setShowOtpVerify] = useState(false)
+    const [pwdOtpValue, setPwdOtpValue] = useState('')
+    const [pwdOtpLoading, setPwdOtpLoading] = useState(false)
 
     const [regMode, setRegMode] = useState<'password' | 'otp'>('password')
     const [regOtpSent, setRegOtpSent] = useState(false)
     const [regOtpValue, setRegOtpValue] = useState('')
     const [regOtpLoading, setRegOtpLoading] = useState(false)
 
-    const { register, isLoading, error: authError, sendOtp, verifyOtp, loginWithGoogle } = useAuthStore();
+    const { register, registerWithOtp, isLoading, error: authError, sendOtp, verifyOtp, loginWithGoogle } = useAuthStore();
     const { isDark, toggle } = useThemeStore();
     const router = useRouter();
 
@@ -80,64 +82,44 @@ export default function RegisterPage() {
 
     // ── Register submit ───────────────────────────────────────────────────────
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
-        e.preventDefault();
-        const newErrors: Record<string, string> = {};
+        e.preventDefault()
+        const newErrors: Record<string, string> = {}
 
-        if (!name.trim()) newErrors.name = 'Name is required';
-        if (!email.trim()) newErrors.email = 'Email is required';
-        else if (!validateEmail(email)) newErrors.email = 'Enter a valid email address';
-        if (!password.trim()) newErrors.password = 'Password is required';
-        else if (password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+        if (!name.trim()) newErrors.name = 'Name is required'
+        if (!email.trim()) newErrors.email = 'Email is required'
+        else if (!validateEmail(email)) newErrors.email = 'Enter a valid email address'
+        if (!password.trim()) newErrors.password = 'Password is required'
+        else if (password.length < 8) newErrors.password = 'Password must be at least 8 characters'
 
         if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            return;
+            setErrors(newErrors)
+            return
         }
 
-        const username = email.split('@')[0];
-        const result = await register({ fullName: name, username, email, password });
+        const username = email.split('@')[0]
+        setPendingName(name)
 
-        if (result === 'confirm_email') {
-            setRegisteredEmail(email);
-            setView('confirm_email');
-            toast.success("Confirmation email sent!", { description: "Check your inbox to activate your account." });
-        } else if (result === true) {
-            toast.success("Account created!", { description: "Setting up your profile." });
-            router.push('/onboarding');
+        const ok = await registerWithOtp({ fullName: name, username, email, password })
+
+        if (ok) {
+            setShowOtpVerify(true)
+            toast.success("Verification code sent!", { description: "Enter the 6-digit code from your inbox." })
         } else {
-            setShake(true);
-            setTimeout(() => setShake(false), 500);
-
-            const errorMsg = useAuthStore.getState().error;
+            setShake(true)
+            setTimeout(() => setShake(false), 500)
+            const errorMsg = useAuthStore.getState().error
             if (errorMsg?.includes('already exists')) {
                 toast.error("Account already exists", {
                     description: "An account with this email already exists.",
-                    action: {
-                        label: "Sign in",
-                        onClick: () => router.push('/login')
-                    }
-                });
+                    action: { label: "Sign in", onClick: () => router.push('/login') }
+                })
             } else {
                 toast.error("Registration failed", {
                     description: errorMsg || "Something went wrong. Please try again."
-                });
+                })
             }
         }
-    }, [name, email, password, register, router]);
-
-    // ── Resend confirmation email ─────────────────────────────────────────────
-    const handleResend = useCallback(async () => {
-        setResendLoading(true);
-        try {
-            const { error } = await supabase.auth.resend({ type: 'signup', email: registeredEmail });
-            if (error) throw error;
-            toast.success("Email resent", { description: "Check your inbox again." });
-        } catch (err) {
-            toast.error("Failed to resend", { description: err instanceof Error ? err.message : 'Try again.' });
-        } finally {
-            setResendLoading(false);
-        }
-    }, [registeredEmail]);
+    }, [name, email, password, registerWithOtp, router])
 
     return (
         <div className={isDark ? "dark" : ""}>
@@ -253,7 +235,7 @@ export default function RegisterPage() {
                                     </div>
                                 )}
 
-                                {regMode === 'password' && (
+                                {regMode === 'password' && !showOtpVerify && (
                                     <form onSubmit={handleSubmit}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                             <Input
@@ -351,6 +333,108 @@ export default function RegisterPage() {
                                             </Link>
                                         </p>
                                     </form>
+                                )}
+
+                                {regMode === 'password' && showOtpVerify && (
+                                    <div style={{ textAlign: 'center' }}>
+                                        {/* Reuse exact same OTP verify UI as regMode==='otp' && regOtpSent */}
+                                        <div style={{
+                                            width: '64px', height: '64px', borderRadius: '50%',
+                                            background: 'var(--accent-primary-10, rgba(99,102,241,0.1))',
+                                            border: '1px solid var(--accent-primary-30, rgba(99,102,241,0.3))',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            margin: '0 auto 20px',
+                                        }}>
+                                            <Mail size={28} style={{ color: 'var(--accent-primary)' }} />
+                                        </div>
+                                        <h2 style={{
+                                            fontFamily: "'Space Grotesk', sans-serif",
+                                            fontWeight: 600, fontSize: '1.5rem',
+                                            color: 'var(--text-primary)', marginBottom: '8px',
+                                        }}>
+                                            Verify your email
+                                        </h2>
+                                        <p style={{
+                                            fontSize: '0.875rem', color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif", marginBottom: '8px', lineHeight: 1.6,
+                                        }}>
+                                            Enter the 6-digit code sent to{' '}
+                                            <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+                                        </p>
+                                        <p style={{
+                                            fontSize: '0.75rem', color: 'var(--text-secondary)',
+                                            fontFamily: "'Inter', sans-serif", marginBottom: '24px',
+                                        }}>
+                                            Your account is created. This step confirms your email.
+                                        </p>
+
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                                            <InputOTP maxLength={6} value={pwdOtpValue} onChange={setPwdOtpValue}>
+                                                <InputOTPGroup>
+                                                    <InputOTPSlot index={0} />
+                                                    <InputOTPSlot index={1} />
+                                                    <InputOTPSlot index={2} />
+                                                    <InputOTPSlot index={3} />
+                                                    <InputOTPSlot index={4} />
+                                                    <InputOTPSlot index={5} />
+                                                </InputOTPGroup>
+                                            </InputOTP>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            <Button
+                                                variant="primary"
+                                                fullWidth
+                                                isLoading={pwdOtpLoading}
+                                                onClick={async () => {
+                                                    if (pwdOtpValue.length !== 6) return
+                                                    setPwdOtpLoading(true)
+                                                    const result = await verifyOtp(email, pwdOtpValue)
+                                                    setPwdOtpLoading(false)
+                                                    if (result === 'authenticated' || result === 'new_user') {
+                                                        toast.success("Email verified! Welcome.", { description: "Setting up your profile." })
+                                                        router.push('/onboarding')
+                                                    } else {
+                                                        toast.error("Invalid or expired code.", { description: "Try again or resend." })
+                                                        setShake(true); setTimeout(() => setShake(false), 500)
+                                                        setPwdOtpValue('')
+                                                    }
+                                                }}
+                                            >
+                                                Verify & Continue →
+                                            </Button>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    setPwdOtpLoading(true)
+                                                    const ok = await sendOtp(email)
+                                                    setPwdOtpLoading(false)
+                                                    if (ok) toast.success("Code resent!", { description: "Check your inbox." })
+                                                    else toast.error("Failed to resend", { description: useAuthStore.getState().error || 'Try again.' })
+                                                }}
+                                                style={{
+                                                    background: 'none', border: 'none',
+                                                    color: 'var(--text-secondary)', fontSize: '0.875rem',
+                                                    fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                                }}
+                                            >
+                                                Resend code
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowOtpVerify(false); setPwdOtpValue('') }}
+                                                style={{
+                                                    background: 'none', border: 'none',
+                                                    color: 'var(--accent-primary)', fontSize: '0.875rem',
+                                                    fontFamily: "'Inter', sans-serif", cursor: 'pointer',
+                                                }}
+                                            >
+                                                ← Back to form
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
 
                                 {regMode === 'otp' && !regOtpSent && (
@@ -508,47 +592,6 @@ export default function RegisterPage() {
                                         </div>
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {/* ── CONFIRM EMAIL VIEW ─────────────────────────── */}
-                        {view === 'confirm_email' && (
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{
-                                    width: '64px', height: '64px', borderRadius: '50%',
-                                    background: 'var(--accent-primary-10, rgba(99,102,241,0.1))',
-                                    border: '1px solid var(--accent-primary-30, rgba(99,102,241,0.3))',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    margin: '0 auto 20px',
-                                }}>
-                                    <Mail size={28} style={{ color: 'var(--accent-primary)' }} />
-                                </div>
-                                <h2 style={{
-                                    fontFamily: "'Space Grotesk', sans-serif",
-                                    fontWeight: 600, fontSize: '1.5rem',
-                                    color: 'var(--text-primary)', marginBottom: '8px',
-                                }}>
-                                    Check your inbox
-                                </h2>
-                                <p style={{
-                                    fontSize: '0.875rem', color: 'var(--text-secondary)',
-                                    fontFamily: "'Inter', sans-serif", marginBottom: '24px', lineHeight: 1.6,
-                                }}>
-                                    We sent a confirmation link to{' '}
-                                    <strong style={{ color: 'var(--text-primary)' }}>{registeredEmail}</strong>.
-                                    Click it to activate your account.
-                                </p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <Button variant="primary" fullWidth isLoading={resendLoading} onClick={handleResend}>
-                                        Resend email
-                                    </Button>
-                                    <Link href="/login" style={{
-                                        color: 'var(--accent-primary)', fontSize: '0.875rem',
-                                        fontFamily: "'Inter', sans-serif", textDecoration: 'none',
-                                    }}>
-                                        ← Back to login
-                                    </Link>
-                                </div>
                             </div>
                         )}
                     </motion.div>

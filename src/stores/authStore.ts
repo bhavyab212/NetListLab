@@ -27,6 +27,7 @@ interface AuthState {
     // Actions
     login: (credentials: { email: string; password: string }) => Promise<true | false | 'email_not_confirmed'>
     register: (data: { email: string; password: string; username: string; fullName: string }) => Promise<true | false | 'confirm_email'>
+    registerWithOtp: (data: { email: string; password: string; username: string; fullName: string }) => Promise<boolean>
     logout: () => Promise<void>
     checkAuth: () => Promise<void>
     sendOtp: (email: string) => Promise<boolean>
@@ -185,6 +186,44 @@ export const useAuthStore = create<AuthState>()(
             },
 
             // ── Register ──────────────────────────────────────────────────────────
+            registerWithOtp: async ({ email, password, username, fullName }) => {
+                set({ isLoading: true, error: null })
+                try {
+                    // Step 1: Create the Supabase account
+                    const { data, error } = await supabase.auth.signUp({ email, password })
+                    
+                    if (error) {
+                        if (
+                            error.message.toLowerCase().includes('already registered') ||
+                            error.message.toLowerCase().includes('already exists') ||
+                            error.message.toLowerCase().includes('user already')
+                        ) {
+                            throw new Error('An account with this email already exists. Try logging in instead.')
+                        }
+                        throw new Error(error.message)
+                    }
+
+                    if (!data.user) throw new Error('Registration failed — no user returned')
+
+                    // Step 2: Send OTP for email verification
+                    const { error: otpError } = await supabase.auth.signInWithOtp({
+                        email,
+                        options: { shouldCreateUser: false } // account already created above
+                    })
+
+                    if (otpError) throw new Error(otpError.message)
+
+                    // Store name/username in memory for use after OTP verification
+                    set({ isLoading: false, error: null })
+                    return true
+
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Registration failed'
+                    set({ error: message, isLoading: false })
+                    return false
+                }
+            },
+
             register: async ({ email, password, username, fullName }) => {
                 set({ isLoading: true, error: null })
                 try {
