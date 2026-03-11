@@ -37,7 +37,7 @@ const notifColors: Record<string, string> = {
 
 export default function DashboardPage() {
     const { isDark, toggle } = useThemeStore();
-    const { isAuthenticated, user: authUser, logout } = useAuthStore();
+    const { isAuthenticated, authStatus, user: authUser, logout } = useAuthStore();
     const router = useRouter();
     const [activeNav, setActiveNav] = useState<NavItem>("overview");
 
@@ -50,23 +50,28 @@ export default function DashboardPage() {
     useEffect(() => setIsMounted(true), []);
 
     useEffect(() => {
-        if (isMounted && !isAuthenticated) router.push("/login");
-    }, [isMounted, isAuthenticated, router]);
+        if (isMounted && authStatus !== 'loading' && authStatus === 'unauthenticated') {
+            router.push("/login");
+        }
+    }, [isMounted, authStatus, router]);
 
     const fetchData = useCallback(async () => {
         if (!authUser) return;
         try {
             setIsLoading(true);
             const [projectsData, starredData, notifsData] = await Promise.all([
-                api.getUserProjects(authUser.username),
-                api.getUserStarred(authUser.username).catch(() => [] as ApiProject[]),
-                api.getNotifications().catch(() => [] as ApiNotification[]),
+                api.getUserProjects(authUser.username).catch(() => null),
+                api.getUserStarred(authUser.username).catch(() => null),
+                api.getNotifications().catch(() => null),
             ]);
-            setMyProjects(projectsData);
-            setStarredProjects(starredData);
-            setNotifications(notifsData);
-        } catch {
-            // continue with empty states
+            
+            if (projectsData) setMyProjects(projectsData);
+            if (starredData) setStarredProjects(starredData);
+            if (notifsData) setNotifications(notifsData);
+            
+        } catch (err) {
+            toast.error("Signal Lost", { description: "Using offline cached data. Reconnecting..." });
+            // Do not reset state to empty arrays here; keep last known good data.
         } finally {
             setIsLoading(false);
         }
@@ -76,12 +81,16 @@ export default function DashboardPage() {
         if (isMounted && isAuthenticated) fetchData();
     }, [isMounted, isAuthenticated, fetchData]);
 
-    if (!isMounted || !isAuthenticated || !authUser) return null;
+    if (!isMounted || authStatus === 'loading' || !authUser) return null;
 
-    const unreadNotifs = notifications.filter(n => !n.is_read).length;
-    const totalStars = myProjects.reduce((s, p) => s + p.star_count, 0);
-    const totalForks = myProjects.reduce((s, p) => s + p.fork_count, 0);
-    const totalViews = myProjects.reduce((s, p) => s + p.view_count, 0);
+    const safeMyProjects = myProjects || [];
+    const safeStarredProjects = starredProjects || [];
+    const safeNotifications = notifications || [];
+
+    const unreadNotifs = safeNotifications.filter(n => !n?.is_read).length;
+    const totalStars = safeMyProjects.reduce((s, p) => s + (p?.star_count || 0), 0);
+    const totalForks = safeMyProjects.reduce((s, p) => s + (p?.fork_count || 0), 0);
+    const totalViews = safeMyProjects.reduce((s, p) => s + (p?.view_count || 0), 0);
 
     const handleFork = async (e: React.MouseEvent, project: ApiProject) => {
         e.stopPropagation();
@@ -101,7 +110,7 @@ export default function DashboardPage() {
 
     const navItems = [
         { id: "overview" as NavItem, label: "Overview", icon: BarChart2 },
-        { id: "projects" as NavItem, label: "My Projects", icon: Cpu, badge: myProjects.length },
+        { id: "projects" as NavItem, label: "My Projects", icon: Cpu, badge: safeMyProjects.length },
         { id: "starred" as NavItem, label: "Starred", icon: Star },
         { id: "notifications" as NavItem, label: "Notifications", icon: Bell, badge: unreadNotifs },
         { id: "settings" as NavItem, label: "Settings", icon: Settings },
@@ -200,10 +209,10 @@ export default function DashboardPage() {
                                     {/* Stats */}
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
                                         {[
-                                            { label: "Total Stars", value: fmt(totalStars), icon: Star, color: "amber", delta: `${myProjects.length} projects` },
+                                            { label: "Total Stars", value: fmt(totalStars), icon: Star, color: "amber", delta: `${safeMyProjects.length} projects` },
                                             { label: "Total Forks", value: fmt(totalForks), icon: GitFork, color: "primary", delta: "across all projects" },
                                             { label: "Total Views", value: fmt(totalViews), icon: Eye, color: "emerald", delta: "lifetime views" },
-                                            { label: "Projects", value: String(myProjects.length), icon: Cpu, color: "violet", delta: "published" },
+                                            { label: "Projects", value: String(safeMyProjects.length), icon: Cpu, color: "violet", delta: "published" },
                                         ].map(stat => (
                                             <div key={stat.label} className="bg-card/60 border border-border rounded-[24px] p-7 hover:border-primary/30 transition-all group">
                                                 <div className="flex items-center justify-between mb-5">
@@ -227,7 +236,7 @@ export default function DashboardPage() {
                                             </button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {myProjects.slice(0, 4).map(p => (
+                                            {safeMyProjects.slice(0, 4).map(p => (
                                                 <div key={p.id} className="bg-card/60 border border-border rounded-[24px] p-6 hover:border-primary/30 transition-all group flex gap-5">
                                                     <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0">
                                                         <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
@@ -235,9 +244,9 @@ export default function DashboardPage() {
                                                     <div className="flex-1 min-w-0">
                                                         <h4 className="text-base font-black font-display text-foreground group-hover:text-primary transition-colors mb-1 truncate">{p.title}</h4>
                                                         <div className="flex gap-4 text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest mb-3">
-                                                            <span className="flex items-center gap-1"><Star size={11} className="text-amber-400" /> {fmt(p.star_count)}</span>
-                                                            <span className="flex items-center gap-1"><GitFork size={11} /> {fmt(p.fork_count)}</span>
-                                                            <span className="flex items-center gap-1"><Eye size={11} /> {fmt(p.view_count)}</span>
+                                                            <span className="flex items-center gap-1"><Star size={11} className="text-amber-400" /> {fmt(p.star_count || 0)}</span>
+                                                            <span className="flex items-center gap-1"><GitFork size={11} /> {fmt(p.fork_count || 0)}</span>
+                                                            <span className="flex items-center gap-1"><Eye size={11} /> {fmt(p.view_count || 0)}</span>
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <Link href={`/project/${p.id}`}><button className="px-3 py-1 rounded-xl bg-primary/10 border border-primary/20 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all flex items-center gap-1"><ExternalLink size={11} /> View</button></Link>
@@ -257,7 +266,7 @@ export default function DashboardPage() {
                                             </button>
                                         </div>
                                         <div className="space-y-3">
-                                            {notifications.slice(0, 5).map(n => {
+                                            {safeNotifications.slice(0, 5).map(n => {
                                                 const actorName = n.actor?.username ?? "unknown";
                                                 const actorAvatar = n.actor?.avatar_url ?? `https://i.pravatar.cc/100?u=${n.actor_id}`;
                                                 const tk = notifTypeLabel(n.type);
@@ -291,7 +300,7 @@ export default function DashboardPage() {
                                         </Link>
                                     </div>
                                     <div className="space-y-4">
-                                        {myProjects.map(p => (
+                                        {safeMyProjects.map(p => (
                                             <div key={p.id} className="bg-card/60 border border-border rounded-[24px] p-7 hover:border-primary/30 transition-all group flex flex-col sm:flex-row items-start sm:items-center gap-6">
                                                 <div className="w-24 h-16 rounded-2xl overflow-hidden shrink-0">
                                                     <img loading="lazy" src={p.cover_image_url ?? `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80`} alt={p.title} className="w-full h-full object-cover" />
@@ -299,9 +308,9 @@ export default function DashboardPage() {
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="text-xl font-black font-display text-foreground group-hover:text-primary transition-colors mb-2">{p.title}</h4>
                                                     <div className="flex flex-wrap gap-5 text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest">
-                                                        <span className="flex items-center gap-1.5"><Star size={12} className="text-amber-400" /> {fmt(p.star_count)}</span>
-                                                        <span className="flex items-center gap-1.5"><GitFork size={12} /> {fmt(p.fork_count)}</span>
-                                                        <span className="flex items-center gap-1.5"><Eye size={12} /> {fmt(p.view_count)}</span>
+                                                        <span className="flex items-center gap-1.5"><Star size={12} className="text-amber-400" /> {fmt(p.star_count || 0)}</span>
+                                                        <span className="flex items-center gap-1.5"><GitFork size={12} /> {fmt(p.fork_count || 0)}</span>
+                                                        <span className="flex items-center gap-1.5"><Eye size={12} /> {fmt(p.view_count || 0)}</span>
                                                         <span className="flex items-center gap-1.5"><Clock size={12} /> {timeAgo(p.created_at)}</span>
                                                         <span className={`px-2.5 py-0.5 rounded-full border text-[9px] ${p.status === "PUBLISHED" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-muted text-muted-foreground border-border"}`}>{p.status}</span>
                                                     </div>
@@ -314,7 +323,7 @@ export default function DashboardPage() {
                                                 </div>
                                             </div>
                                         ))}
-                                        {myProjects.length === 0 && !isLoading && (
+                                        {safeMyProjects.length === 0 && !isLoading && (
                                             <div className="py-24 text-center border-2 border-dashed border-muted rounded-[32px]">
                                                 <Cpu size={40} className="mx-auto mb-4 text-muted-foreground/20" />
                                                 <h3 className="text-xl font-black font-display mb-2">No projects yet</h3>
@@ -331,7 +340,7 @@ export default function DashboardPage() {
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                                     <h1 className="text-3xl font-black font-display">Starred Projects</h1>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {starredProjects.map(p => (
+                                        {safeStarredProjects.map(p => (
                                             <Link key={p.id} href={`/project/${p.id}`}>
                                                 <div className="bg-card/60 border border-border rounded-[24px] overflow-hidden hover:border-primary/30 transition-all group">
                                                     <div className="aspect-[16/9] relative overflow-hidden">
@@ -345,7 +354,7 @@ export default function DashboardPage() {
                                                 </div>
                                             </Link>
                                         ))}
-                                        {starredProjects.length === 0 && !isLoading && (
+                                        {safeStarredProjects.length === 0 && !isLoading && (
                                             <div className="col-span-2 py-24 text-center border-2 border-dashed border-muted rounded-[32px]">
                                                 <Star size={40} className="mx-auto mb-4 text-muted-foreground/20" />
                                                 <h3 className="text-xl font-black font-display mb-2">No starred projects yet</h3>
@@ -369,7 +378,7 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-3">
-                                        {notifications.map(n => {
+                                        {safeNotifications.map(n => {
                                             const actorName = n.actor?.username ?? "unknown";
                                             const actorAvatar = n.actor?.avatar_url ?? `https://i.pravatar.cc/100?u=${n.actor_id}`;
                                             const tk = notifTypeLabel(n.type);
@@ -391,7 +400,7 @@ export default function DashboardPage() {
                                                 </div>
                                             );
                                         })}
-                                        {notifications.length === 0 && !isLoading && (
+                                        {safeNotifications.length === 0 && !isLoading && (
                                             <div className="py-24 text-center border-2 border-dashed border-muted rounded-[32px]">
                                                 <Bell size={40} className="mx-auto mb-4 text-muted-foreground/20" />
                                                 <h3 className="text-xl font-black font-display mb-2">All clear</h3>

@@ -24,8 +24,14 @@ export default function RealtimeProvider({ children }: { children: React.ReactNo
             }, 5000);
         }
 
-        const channel = supabase
-            .channel(`public:notifications:recipient_id=eq.${user.id}`)
+        const channelName = `public:notifications:recipient_id=eq.${user.id}`
+        let channel = supabase.channel(channelName)
+        let retryCount = 0;
+        let reconnectTimer: NodeJS.Timeout;
+
+        const setupSubscription = () => {
+            channel = supabase
+                .channel(channelName)
             .on(
                 'postgres_changes',
                 {
@@ -72,9 +78,29 @@ export default function RealtimeProvider({ children }: { children: React.ReactNo
                     }
                 }
             )
-            .subscribe()
+
+            channel.subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    retryCount = 0; // Reset backoff on success
+                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    // Stop current channel to prevent duplicate listeners
+                    supabase.removeChannel(channel);
+                    
+                    // Exponential backoff (1s, 2s, 4s, 8s -> max 30s)
+                    const timeout = Math.min(1000 * Math.pow(2, retryCount), 30000);
+                    retryCount++;
+                    
+                    reconnectTimer = setTimeout(() => {
+                        setupSubscription();
+                    }, timeout);
+                }
+            });
+        }
+
+        setupSubscription();
 
         return () => {
+            clearTimeout(reconnectTimer);
             supabase.removeChannel(channel)
         }
     }, [user, fetchNotifications, addNotification, hasFetched])
