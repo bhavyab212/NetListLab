@@ -50,13 +50,18 @@ export default function DashboardPage() {
     useEffect(() => setIsMounted(true), []);
 
     useEffect(() => {
-        if (isMounted && authStatus !== 'loading' && authStatus === 'unauthenticated') {
+        if (isMounted && (authStatus === 'unauthenticated' || authStatus === 'session_expired')) {
             router.push("/login");
         }
     }, [isMounted, authStatus, router]);
 
     const fetchData = useCallback(async () => {
-        if (!authUser) return;
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser) {
+            setIsLoading(false);
+            return;
+        }
+        const authUser = currentUser;
         try {
             setIsLoading(true);
             const [projectsData, starredData, notifsData] = await Promise.all([
@@ -81,7 +86,21 @@ export default function DashboardPage() {
         if (isMounted && isAuthenticated) fetchData();
     }, [isMounted, isAuthenticated, fetchData]);
 
-    if (!isMounted || authStatus === 'loading' || !authUser) return null;
+    if (!isMounted) return null;
+    if (authStatus === 'loading') return (
+        <div className={isDark ? "dark" : ""}>
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-muted-foreground text-sm font-medium">Loading your lab...</p>
+                </div>
+            </div>
+        </div>
+    );
+    if (authStatus === 'unauthenticated' || authStatus === 'session_expired') {
+        router.push('/login');
+        return null;
+    }
 
     const safeMyProjects = myProjects || [];
     const safeStarredProjects = starredProjects || [];
