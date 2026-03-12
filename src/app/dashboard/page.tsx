@@ -133,14 +133,14 @@ export default function DashboardPage() {
                         <div className="p-6 border-b border-border">
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <img loading="lazy" src={authUser.avatar_url ?? authUser.avatar ?? `https://i.pravatar.cc/150?u=${authUser.id}`} alt={authUser.full_name ?? authUser.fullName} className="w-12 h-12 rounded-full border-2 border-border" />
+                                    <img loading="lazy" src={authUser?.avatar_url ?? authUser?.avatar ?? `https://i.pravatar.cc/150?u=${authUser?.id}`} alt={authUser?.full_name ?? authUser?.fullName ?? 'User'} className="w-12 h-12 rounded-full border-2 border-border" />
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-foreground truncate">{authUser.full_name ?? authUser.fullName}</p>
-                                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">@{authUser.username}</p>
+                                    <p className="text-sm font-black text-foreground truncate">{authUser?.full_name ?? authUser?.fullName ?? 'Anonymous Builder'}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">@{authUser?.username ?? 'unknown'}</p>
                                 </div>
-                                <Link href={`/user/${authUser.username}`}>
+                                <Link href={`/user/${authUser?.username ?? 'unknown'}`}>
                                     <button className="p-2 rounded-xl bg-muted/50 border border-border text-muted-foreground hover:text-primary transition-all"><ExternalLink size={14} /></button>
                                 </Link>
                             </div>
@@ -202,7 +202,7 @@ export default function DashboardPage() {
                             {activeNav === "overview" && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-10">
                                     <div>
-                                        <h1 className="text-4xl font-black font-display tracking-tight mb-2">Welcome back, {(authUser.full_name ?? authUser.fullName)?.split(" ")[0]} 👋</h1>
+                                        <h1 className="text-4xl font-black font-display tracking-tight mb-2">Welcome back, {(authUser?.full_name ?? authUser?.fullName ?? "Builder")?.split(" ")[0]} 👋</h1>
                                         <p className="text-muted-foreground font-medium">Here&apos;s what&apos;s happening in your laboratory.</p>
                                     </div>
 
