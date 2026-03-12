@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, useSpring, AnimatePresence } from 'framer-motion';
+import { motion, useSpring, AnimatePresence, useMotionValue } from 'framer-motion';
 
 /**
  * LiquidCursor — An organic liquid water-drop cursor.
@@ -49,9 +49,9 @@ export default function LiquidCursor({ isDark: isDarkProp, dropSize = 28 }: Liqu
 
     // ─── Spring Physics ────────────────────────────────────────────
 
-    // Main cursor — fast, snappy
-    const mouseX = useSpring(0, { stiffness: 200, damping: 25, mass: 0.5 });
-    const mouseY = useSpring(0, { stiffness: 200, damping: 25, mass: 0.5 });
+    // Main cursor — instant tracking
+    const mouseX = useMotionValue(0);
+    const mouseY = useMotionValue(0);
 
     // Trail — slow, lagging
     const trailX = useSpring(0, { stiffness: 120, damping: 30, mass: 0.8 });
