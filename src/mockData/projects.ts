@@ -605,4 +605,177 @@ export const projects: Project[] = [
       { name: "OpenScope_Schematic_v3.pdf", size: "1.8MB", fmt: "PDF", url: "#", desc: "Full annotated schematic PDF" }
     ]
   },
+  {
+    id: 11,
+    title: "ESP32 Air Mouse with MPU6050",
+    slug: "esp32-air-mouse-mpu6050",
+    authorId: "user-1",
+    author: "bhavya_dev",
+    authorAvatar: "https://i.pravatar.cc/150?u=user1",
+    description: "Wearable Bluetooth air mouse built with ESP32 and MPU6050 IMU. Tracks hand orientation in 3D space, applies sensor fusion, and exposes a standard HID mouse over Bluetooth to control a PC or smart TV.",
+    image: "https://images.unsplash.com/photo-1601004890657-03e58aaf2570?auto=format&fit=crop&w=900&q=80",
+    category: "Electronics",
+    categoryStyles: "bg-emerald-100/90 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/50 backdrop-blur-xl shadow-lg",
+    level: "Intermediate",
+    tags: ["ESP32", "MPU6050", "Bluetooth", "HID", "Wearable"],
+    stars: 980,
+    views: 5123,
+    comments: 27,
+    forks: 143,
+    createdAt: "2026-02-24T18:00:00.000Z",
+    status: "published",
+    version: "v1.0.0",
+    license: "MIT",
+    githubUrl: "https://github.com/bhavya_dev/esp32-air-mouse",
+    safetyNotice: "Low-voltage wearable. Insulate all solder joints. Use Li-ion cells with built-in protection PCB.",
+    prerequisites: [
+      "Basic Arduino / ESP-IDF familiarity",
+      "Understanding of accelerometer and gyroscope axes",
+      "Ability to solder header pins"
+    ],
+    tools: ["Fine-tip soldering iron", "3D printer (for enclosure, optional)", "Multimeter"],
+    objectives: [
+      "Use hand motions to move a mouse cursor in X–Y plane",
+      "Implement click and drag gestures using hardware buttons",
+      "Achieve smooth, low-latency pointer motion over Bluetooth HID"
+    ],
+    designDecisions: [
+      { q: "Why ESP32 + Bluetooth HID instead of USB?", a: "Bluetooth HID lets the air mouse connect to laptops, TVs, and tablets wirelessly, without needing a USB dongle or cable." },
+      { q: "Why MPU6050 IMU?", a: "MPU6050 integrates a 3-axis accelerometer and 3-axis gyro, is inexpensive, and has a mature Arduino ecosystem." }
+    ],
+    bom: [
+      { name: "ESP32 DevKitC", category: "Microcontroller", qty: 1, price: "₹350", supplier: "Robu", link: "https://robu.in/product/esp32-devkitc-development-board/" },
+      { name: "MPU6050 6-axis IMU Module", category: "Sensor", qty: 1, price: "₹180", supplier: "Robu", link: "https://robu.in/product/mpu6050-3-axis-gyroscope-accelerometer-module/" },
+      { name: "TP4056 Li-ion Charger Module", category: "Power", qty: 1, price: "₹70", supplier: "Robu", link: "https://robu.in" },
+      { name: "18650 Li-ion Cell 2200mAh", category: "Battery", qty: 1, price: "₹220", supplier: "Amazon", link: "#" },
+      { name: "Tactile Push Button 6×6mm", category: "Input", qty: 3, price: "₹10", supplier: "Any", link: "#" }
+    ],
+    buildSteps: [
+      { title: "Wire ESP32 and MPU6050", time: "20m", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80", body: "Connect MPU6050 VCC→3V3, GND→GND, SCL→GPIO22, SDA→GPIO21. Keep I2C wires short and twisted to reduce noise." },
+      { title: "Add Click Buttons and Power", time: "15m", imageUrl: "", body: "Wire two buttons to GPIOs with pull-downs for left/right click. Add TP4056 + 18650 cell for portable power." },
+      { title: "Flash Firmware and Calibrate", time: "20m", imageUrl: "", body: "Upload firmware via Arduino IDE. Open serial monitor, keep device flat, press calibration button to zero pitch/roll offsets." }
+    ],
+    codeFiles: [
+      {
+        id: "air-mouse-main",
+        name: "main.cpp",
+        language: "cpp",
+        content: "#include <BleMouse.h>\n#include <Wire.h>\n#include \"mpu6050.h\"\n\nBleMouse mouse(\"NetList Air Mouse\");\n\nvoid setup() {\n  Serial.begin(115200);\n  Wire.begin();\n  mpu_init();\n  mouse.begin();\n}\n\nvoid loop() {\n  if (!mouse.isConnected()) return;\n  float pitch, roll;\n  mpu_read_angles(pitch, roll);\n  int dx = (int)(roll * 3.0f);\n  int dy = (int)(-pitch * 3.0f);\n  mouse.move(dx, dy);\n  delay(10);\n}"
+      }
+    ],
+    dependencies: [
+      { name: "BleMouse", ver: "0.3.0", license: "MIT", desc: "Arduino BLE HID mouse library for ESP32." },
+      { name: "MPU6050 Driver", ver: "1.0.0", license: "MIT", desc: "Minimal driver for reading raw accel/gyro and computing pitch/roll." }
+    ],
+    buildInstructions: [
+      { step: "Clone", cmd: "git clone https://github.com/bhavya_dev/esp32-air-mouse", note: "Open in Arduino IDE or VS Code + PlatformIO." },
+      { step: "Configure", cmd: "Copy config.example.h to config.h and adjust sensitivity constants.", note: "Tune gain values for your hand movement range." },
+      { step: "Flash", cmd: "Upload to ESP32 DevKitC at 115200 baud.", note: "Press BOOT if your board requires it." }
+    ],
+    envSetup: [
+      { title: "Arduino Toolchain", items: ["Arduino IDE 2.x or PlatformIO", "ESP32 board support installed", "BleMouse and MPU6050 libraries installed"] }
+    ],
+    testSuite: [
+      { name: "Static Drift", file: "tests/drift.md", status: "pass", ms: "60000", desc: "Device held still for 60s; pointer stayed within 40px radius on 1080p monitor." },
+      { name: "Latency Check", file: "tests/latency.md", status: "pass", ms: "15", desc: "Measured ~15ms motion-to-cursor latency using high-speed camera and LED marker." }
+    ],
+    galleryImages: [
+      { url: "https://images.unsplash.com/photo-1601004890657-03e58aaf2570?auto=format&fit=crop&w=600&q=80", caption: "ESP32 DevKitC with MPU6050 mounted on a small 3D-printed grip.", label: "Prototype" }
+    ],
+    simulations: [
+      { title: "Gesture Debug Simulator", desc: "Simple visualizer that shows pitch and roll angles as bars while you move your hand.", url: "https://wokwi.com", icon: "🖱️", badge: "MPU6050" }
+    ],
+    downloads: [
+      { name: "ESP32_AirMouse_Firmware_v1.0.bin", size: "96KB", fmt: "BIN", url: "#", desc: "Pre-compiled firmware for ESP32 DevKitC." },
+      { name: "AirMouse_3D_Enclosure.stl", size: "1.8MB", fmt: "STL", url: "#", desc: "3D-printed shell for handheld grip and buttons." }
+    ]
+  },
+  {
+    id: 12,
+    title: "ESP32 3D Orientation Simulator",
+    slug: "esp32-3d-orientation-sim",
+    authorId: "user-2",
+    author: "tech_wizard",
+    authorAvatar: "https://i.pravatar.cc/150?u=user2",
+    description: "Wi-Fi-enabled ESP32 + MPU6050 board that streams real-time orientation to a browser, which renders a 3D model using Three.js. Perfect for visualizing IMU attitude and debugging robotics or aerospace projects.",
+    image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=900&q=80",
+    category: "Electronics",
+    categoryStyles: "bg-emerald-100/90 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/50 backdrop-blur-xl shadow-lg",
+    level: "Intermediate",
+    tags: ["ESP32", "MPU6050", "3D", "Three.js", "Web"],
+    stars: 1245,
+    views: 6890,
+    comments: 38,
+    forks: 204,
+    createdAt: "2026-03-01T10:30:00.000Z",
+    status: "published",
+    version: "v1.0.0",
+    license: "MIT",
+    githubUrl: "https://github.com/tech_wizard/esp32-3d-orientation",
+    safetyNotice: "Mount the board securely when moving it quickly; avoid letting wired USB cables whip around during demonstrations.",
+    prerequisites: [
+      "Basic ESP32 + Wi-Fi knowledge",
+      "Familiarity with HTML / JavaScript",
+      "Understanding of yaw/pitch/roll"
+    ],
+    tools: ["ESP32 DevKitC or similar", "MPU6050 breakout", "Browser with WebGL (Chrome/Firefox)"],
+    objectives: [
+      "Render a live 3D model that tracks board orientation",
+      "Update 3D view at ~30 FPS using server-sent events",
+      "Display raw accelerometer and gyroscope readings alongside the model"
+    ],
+    designDecisions: [
+      { q: "Why Three.js on the frontend?", a: "Three.js abstracts WebGL boilerplate and makes it easy to add lighting, materials, and camera controls for the 3D board model." },
+      { q: "Why SSE instead of polling?", a: "Server-Sent Events push updates from ESP32 to the browser with less overhead than repeated HTTP polling." }
+    ],
+    bom: [
+      { name: "ESP32 DevKitC", category: "Microcontroller", qty: 1, price: "₹350", supplier: "Robu", link: "https://robu.in" },
+      { name: "MPU6050 IMU Breakout", category: "Sensor", qty: 1, price: "₹180", supplier: "Robu", link: "https://robu.in" }
+    ],
+    buildSteps: [
+      { title: "Connect IMU to ESP32", time: "10m", imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80", body: "Wire MPU6050 to ESP32 over I2C (3V3, GND, SDA→GPIO21, SCL→GPIO22). Double-check axis orientation so the 3D model matches physical movement." },
+      { title: "Flash Wi-Fi Web Server", time: "10m", imageUrl: "", body: "Flash the ESP32 firmware that exposes a web server on port 80 and streams IMU data to /events endpoint using SSE." },
+      { title: "Open Browser Dashboard", time: "5m", imageUrl: "", body: "Connect your PC to the same Wi-Fi. Visit http://<esp32-ip>/ to see the live 3D cube and sensor readouts." }
+    ],
+    codeFiles: [
+      {
+        id: "esp32-3d-main",
+        name: "main.cpp",
+        language: "cpp",
+        content: "#include <WiFi.h>\n#include <ESPAsyncWebServer.h>\n#include \"mpu6050.h\"\n#include \"web_assets.h\"\n\nAsyncWebServer server(80);\nAsyncEventSource events(\"/events\");\n\nvoid setup() {\n  Serial.begin(115200);\n  WiFi.begin(WIFI_SSID, WIFI_PASS);\n  while (WiFi.status() != WL_CONNECTED) delay(200);\n  mpu_init();\n  server.on(\"/\", HTTP_GET, [](AsyncWebServerRequest *req){\n    req->send_P(200, \"text/html\", INDEX_HTML);\n  });\n  server.addHandler(&events);\n  server.begin();\n  Serial.println(WiFi.localIP());\n}\n\nvoid loop() {\n  static uint32_t last = 0;\n  if (millis() - last > 33) {\n    last = millis();\n    float yaw, pitch, roll;\n    mpu_read_ypr(yaw, pitch, roll);\n    char buf[128];\n    snprintf(buf, sizeof(buf), \"{\\\"yaw\\\":%.2f,\\\"pitch\\\":%.2f,\\\"roll\\\":%.2f}\", yaw, pitch, roll);\n    events.send(buf, \"orientation\");\n  }\n}"
+      },
+      {
+        id: "esp32-3d-index",
+        name: "index.html",
+        language: "html",
+        content: "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\" />\n  <title>ESP32 3D Orientation</title>\n  <style>body{margin:0;background:#020617;color:#e5e7eb;font-family:system-ui;}#hud{position:absolute;top:10px;left:10px;font-size:13px;line-height:2;}canvas{display:block;}</style>\n  <script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js\"></script>\n</head>\n<body>\n<div id=\"hud\">\n  Yaw: <span id=\"yaw\">0</span>°<br/>\n  Pitch: <span id=\"pitch\">0</span>°<br/>\n  Roll: <span id=\"roll\">0</span>°\n</div>\n<script>\n  const scene = new THREE.Scene();\n  const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 100);\n  camera.position.z = 3;\n  const renderer = new THREE.WebGLRenderer({antialias:true});\n  renderer.setSize(innerWidth, innerHeight);\n  document.body.appendChild(renderer.domElement);\n  const geo = new THREE.BoxGeometry(2, 0.3, 1.2);\n  const mat = new THREE.MeshPhongMaterial({color:0x00e5ff, wireframe:false});\n  const cube = new THREE.Mesh(geo, mat);\n  scene.add(cube);\n  scene.add(new THREE.AmbientLight(0xffffff, 0.6));\n  const dl = new THREE.DirectionalLight(0xffffff, 0.8);\n  dl.position.set(5,5,5); scene.add(dl);\n  const source = new EventSource('/events');\n  source.addEventListener('orientation', (e) => {\n    const o = JSON.parse(e.data);\n    document.getElementById('yaw').textContent = o.yaw.toFixed(1);\n    document.getElementById('pitch').textContent = o.pitch.toFixed(1);\n    document.getElementById('roll').textContent = o.roll.toFixed(1);\n    cube.rotation.y = o.yaw * Math.PI / 180;\n    cube.rotation.x = o.pitch * Math.PI / 180;\n    cube.rotation.z = o.roll * Math.PI / 180;\n  });\n  (function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); })();\n</script>\n</body>\n</html>"
+      }
+    ],
+    dependencies: [
+      { name: "ESPAsyncWebServer", ver: "3.0.0", license: "LGPL-3.0", desc: "Async web server + SSE support for ESP32." },
+      { name: "Three.js", ver: "r152", license: "MIT", desc: "3D rendering engine for the browser board model." }
+    ],
+    buildInstructions: [
+      { step: "Configure Wi-Fi", cmd: "Edit config.h and set WIFI_SSID / WIFI_PASS.", note: "Switch to AP mode if you want the ESP32 to host its own network." },
+      { step: "Upload Filesystem", cmd: "Upload web assets (index.html) to ESP32 LittleFS using the PlatformIO filesystem uploader.", note: "Or inline the HTML as a PROGMEM string in web_assets.h." },
+      { step: "Flash & Open Browser", cmd: "Flash firmware, check Serial Monitor for IP, open http://<ip>/ in Chrome.", note: "Enable WebGL in browser if not already active." }
+    ],
+    envSetup: [
+      { title: "Web Tooling", items: ["Modern browser with WebGL2 support", "VS Code + PlatformIO for flashing", "Node.js (optional) for asset bundling"] }
+    ],
+    testSuite: [
+      { name: "Orientation Consistency", file: "tests/orientation.md", status: "pass", ms: "300000", desc: "Rotated board around each axis; browser values matched serial output within ±1°." },
+      { name: "Update Rate", file: "tests/fps.md", status: "pass", ms: "10000", desc: "Sustained ~30 FPS SSE update rate confirmed in Chrome DevTools." }
+    ],
+    galleryImages: [
+      { url: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=600&q=80", caption: "ESP32 + MPU6050 dev board used as a 3D orientation probe.", label: "Live Demo" }
+    ],
+    simulations: [
+      { title: "Wokwi Orientation Demo", desc: "Simulate ESP32 + MPU6050 wiring in Wokwi and watch JSON orientation packets in the serial monitor.", url: "https://wokwi.com", icon: "🧪", badge: "Simulator" }
+    ],
+    downloads: [
+      { name: "ESP32_3D_Orientation_Firmware.bin", size: "128KB", fmt: "BIN", url: "#", desc: "Compiled firmware with Wi-Fi + SSE streaming." },
+      { name: "Web_Dashboard_Files.zip", size: "35KB", fmt: "ZIP", url: "#", desc: "index.html + Three.js 3D dashboard source." }
+    ]
+  }
 ];
