@@ -32,7 +32,7 @@ interface ProjectsState {
 export const useProjectsStore = create<ProjectsState>()(
     persist(
         (set: any, get: any): ProjectsState => ({
-            projects: [...initialProjects], // Seed with mock data
+            projects: [...initialProjects], // Always start fresh from source
             starredIds: new Set<number>(),
             bookmarkedIds: new Set<number>(),
             forkedProjectIds: new Set<number>(),
@@ -233,12 +233,22 @@ export const useProjectsStore = create<ProjectsState>()(
         }),
         {
             name: 'netlistlab-projects',
-            version: 2,
-            migrate: () => ({
-                projects: [...initialProjects],
-                starredIds: new Set<number>(),
-                bookmarkedIds: new Set<number>(),
-                forkedProjectIds: new Set<number>(),
+            // After loading from localStorage, merge user-forked projects back into
+            // the fresh initialProjects list. This preserves forks while ensuring
+            // all source projects (including newly added ones) are always visible.
+            onRehydrateStorage: () => (state) => {
+                if (!state) return;
+                const persistedForks = state.projects.filter((p: Project) => !!p.forkedFrom);
+                state.projects = [...initialProjects, ...persistedForks];
+            },
+            // Only persist user-specific preferences — NOT the projects array.
+            // Projects always load fresh from mockData/projects.ts on every page load.
+            // This ensures new projects immediately appear without any cache invalidation tricks.
+            partialize: (state: ProjectsState) => ({
+                starredIds: state.starredIds,
+                bookmarkedIds: state.bookmarkedIds,
+                forkedProjectIds: state.forkedProjectIds,
+                projects: state.projects.filter((p: Project) => !!p.forkedFrom), // only persist user-forked projects
             }),
             // Set serialization is needed because JSON.stringify doesn't handle Maps/Sets
             storage: {
