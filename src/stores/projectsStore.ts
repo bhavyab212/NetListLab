@@ -233,6 +233,13 @@ export const useProjectsStore = create<ProjectsState>()(
         }),
         {
             name: 'netlistlab-projects',
+            version: 2,
+            migrate: () => ({
+                projects: [...initialProjects],
+                starredIds: new Set<number>(),
+                bookmarkedIds: new Set<number>(),
+                forkedProjectIds: new Set<number>(),
+            }),
             // Set serialization is needed because JSON.stringify doesn't handle Maps/Sets
             storage: {
                 getItem: (name: string) => {
