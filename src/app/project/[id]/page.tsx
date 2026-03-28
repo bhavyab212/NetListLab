@@ -1529,15 +1529,18 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ id: s
                               project.demoUrl ? { label: "Demo / Video", icon: Globe, href: project.demoUrl } : null,
                               apiBOM.length > 0 ? { label: "Download BOM (CSV)", icon: ShoppingCart, href: api.getBOMcsvUrl(project.id) } : null,
                               { label: "Share Project", icon: Share2, href: "#" },
-                            ].filter(Boolean).map(l => (
-                              <a key={l!.label} href={l!.href} target="_blank" rel="noopener noreferrer"
-                                onClick={l!.href === "#" ? (e) => { e.preventDefault(); handleShare(); } : undefined}
-                                className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 border border-transparent hover:border-border text-sm font-bold text-muted-foreground hover:text-foreground transition-all group">
-                                <l.icon size={15} className="text-primary group-hover:scale-110 transition-transform" />
-                                {l!.label}
-                                <ExternalLink size={12} className="ml-auto opacity-40" />
-                              </a>
-                            ))}
+                            ].map(l => {
+                              if (!l) return null;
+                              return (
+                                <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer"
+                                  onClick={l.href === "#" ? (e) => { e.preventDefault(); handleShare(); } : undefined}
+                                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 border border-transparent hover:border-border text-sm font-bold text-muted-foreground hover:text-foreground transition-all group">
+                                  <l.icon size={15} className="text-primary group-hover:scale-110 transition-transform" />
+                                  {l.label}
+                                  <ExternalLink size={12} className="ml-auto opacity-40" />
+                                </a>
+                              );
+                            })}
                           </div>
                         </div>
 

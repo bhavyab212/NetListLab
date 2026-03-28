@@ -6,6 +6,8 @@
  * Make sure the server is running first: npm run dev
  */
 
+export {};
+
 const BASE_URL = process.env.API_URL || 'http://localhost:3001';
 
 // ANSI colors
